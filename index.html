@@ -20,8 +20,21 @@
         body {
             font-family: 'Zen Maru Gothic', sans-serif;
             background: radial-gradient(circle at center, #fce7f3 0%, #fbcfe8 100%);
-            min-height: 100vh;
-            padding-bottom: 2rem;
+            /* 修改：設定固定高度 100vh 並隱藏捲軸 */
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 手機版恢復捲動，避免內容被截斷 */
+        @media (max-width: 1024px) {
+            body {
+                height: auto;
+                min-height: 100vh;
+                overflow-y: auto;
+                padding-bottom: 2rem;
+            }
         }
 
         .impact-panel {
@@ -107,7 +120,7 @@
         }
 
         ::-webkit-scrollbar {
-            width: 10px;
+            width: 8px;
         }
         ::-webkit-scrollbar-track {
             background: #fce7f3;
@@ -672,12 +685,12 @@
             }
 
             return (
-                <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto flex flex-col">
+                <div className="h-screen flex flex-col p-2 md:p-6 max-w-[1600px] mx-auto w-full">
                     <input type="file" ref={fileInputRef} onChange={handleImport} style={{display: 'none'}} accept=".json" />
                     <input type="file" ref={participantsInputRef} onChange={handleImportParticipants} style={{display: 'none'}} accept=".csv" />
 
                     {/* Header */}
-                    <div className="flex flex-wrap gap-3 mb-6 items-center">
+                    <div className="flex-none flex flex-wrap gap-3 mb-4 items-center">
                         <div className="text-3xl font-black text-pink-600 mr-4 flex items-center gap-2 drop-shadow-sm select-none">
                             LUCKY DRAW
                         </div>
@@ -700,11 +713,11 @@
                         </div>
                     </div>
 
-                    {/* Main Content Area */}
-                    <main className="impact-panel p-6 md:p-8 relative overflow-hidden flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                    {/* Main Content Area - Updated for responsive layout without body scroll */}
+                    <main className="impact-panel flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 p-4 relative overflow-hidden">
                         {/* Left: The Wheel */}
-                        <div className="lg:col-span-7 flex flex-col items-center justify-center min-h-[500px]">
-                            <div className="mb-10 text-center w-full max-w-lg">
+                        <div className="lg:col-span-7 flex flex-col items-center justify-center h-full min-h-0 overflow-y-auto lg:overflow-visible">
+                            <div className="flex-none mb-4 text-center w-full max-w-lg">
                                 <div className="text-pink-500 font-black mb-2 tracking-widest text-sm uppercase bg-pink-100 inline-block px-3 py-1 rounded-full">Current Prize</div>
                                 <h2 className="text-5xl md:text-6xl font-black text-gray-800 flex items-center justify-center gap-4 drop-shadow-sm my-2">
                                     <Gift className="text-rose-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
@@ -713,37 +726,36 @@
                                 <div className="flex justify-center mt-2"><span className="bg-gray-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">剩餘數量: {currentPrize ? currentPrize.count : 0}</span></div>
                             </div>
 
-                            {/* The Big Animated Card (Reverted to Flashing Pop) */}
-                            <div className={`w-full max-w-2xl aspect-[16/9] bg-gradient-to-br from-white to-gray-50 rounded-[32px] flex items-center justify-center relative overflow-hidden transition-all ${isSpinning ? 'rainbow-border' : 'border-[6px] border-yellow-400 shadow-[0_15px_40px_-10px_rgba(251,191,36,0.5)]'}`}>
-                                <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
-                                <div className="z-10 text-center w-full px-4">
-                                    {isSpinning ? (
-                                        <div className="animate-pop">
-                                            {/* 修改：增加 py-2 與 leading-normal 避免文字下方被切到 */}
-                                            <div className="text-6xl md:text-8xl font-black gold-text-impact tracking-tight leading-normal py-2">
-                                                {displayParticipant?.name}
+                            {/* Wheel Container - Responsive Height */}
+                            <div className="flex-1 w-full max-h-[60vh] flex items-center justify-center min-h-0">
+                                <div className={`aspect-[16/10] h-full w-auto max-w-full bg-gradient-to-br from-white to-gray-50 rounded-[32px] flex items-center justify-center relative overflow-hidden transition-all ${isSpinning ? 'rainbow-border' : 'border-[6px] border-yellow-400 shadow-[0_15px_40px_-10px_rgba(251,191,36,0.5)]'}`}>
+                                    <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
+                                    <div className="z-10 text-center w-full px-4">
+                                        {isSpinning ? (
+                                            <div className="animate-pop">
+                                                <div className="text-6xl md:text-8xl font-black gold-text-impact tracking-tight leading-normal py-2">{displayParticipant?.name}</div>
+                                                <div className="text-xl md:text-2xl font-bold gold-text-impact mt-2 tracking-widest pb-2">{displayParticipant?.group || ''}</div>
                                             </div>
-                                            {/* 修改：增加 pb-2 確保下方空間 */}
-                                            <div className="text-xl md:text-2xl font-bold gold-text-impact mt-2 tracking-widest pb-2">
-                                                {displayParticipant?.group || ''}
+                                        ) : (
+                                            <div className="flex flex-col items-center animate-bounce-slow opacity-60">
+                                                <span className="text-8xl mb-4 opacity-50">🎰</span>
+                                                <span className="text-4xl md:text-5xl font-black gold-text-impact tracking-wider leading-relaxed py-2">READY TO DRAW</span>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center animate-bounce-slow opacity-60">
-                                            <span className="text-8xl mb-4 opacity-50">🎰</span>
-                                            <span className="text-4xl md:text-5xl font-black gold-text-impact tracking-wider leading-relaxed py-2">READY TO DRAW</span>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                            <button onClick={startDraw} disabled={isSpinning || !currentPrize || currentPrize.count === 0} className={`mt-10 w-full max-w-sm py-5 rounded-2xl text-3xl font-black shadow-[0_10px_0_0_rgba(0,0,0,0.2)] transform transition-all active:shadow-none active:translate-y-[10px] ${(isSpinning || !currentPrize || currentPrize.count === 0) ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-y-[10px]' : 'bg-gradient-to-r from-rose-500 to-pink-600 text-white hover:brightness-110 shadow-[0_10px_0_0_#9d174d]'}`}>{isSpinning ? 'SPINNING...' : (currentPrize && currentPrize.count === 0 ? '獎項已抽完' : '開始抽獎 !')}</button>
+                            
+                            <div className="flex-none mt-6 w-full flex justify-center">
+                                <button onClick={startDraw} disabled={isSpinning || !currentPrize || currentPrize.count === 0} className={`w-full max-w-sm py-5 rounded-2xl text-3xl font-black shadow-[0_10px_0_0_rgba(0,0,0,0.2)] transform transition-all active:shadow-none active:translate-y-[10px] ${(isSpinning || !currentPrize || currentPrize.count === 0) ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-y-[10px]' : 'bg-gradient-to-r from-rose-500 to-pink-600 text-white hover:brightness-110 shadow-[0_10px_0_0_#9d174d]'}`}>{isSpinning ? 'SPINNING...' : (currentPrize && currentPrize.count === 0 ? '獎項已抽完' : '開始抽獎 !')}</button>
+                            </div>
                         </div>
 
                         {/* Right: Info Panel */}
-                        <div className="lg:col-span-5 flex flex-col gap-6">
+                        <div className="lg:col-span-5 flex flex-col gap-4 h-full min-h-0">
                             {/* Prize List */}
-                            <div className="flex-1 bg-white rounded-3xl p-1 shadow-inner border-2 border-pink-100 flex flex-col h-[320px]">
-                                <div className="bg-pink-50 p-4 rounded-t-[20px] flex items-center justify-between border-b-2 border-pink-100">
+                            <div className="flex-1 min-h-0 bg-white rounded-3xl p-1 shadow-inner border-2 border-pink-100 flex flex-col">
+                                <div className="bg-pink-50 p-4 rounded-t-[20px] flex-none flex items-center justify-between border-b-2 border-pink-100">
                                     <h3 className="font-black text-xl text-pink-600 flex items-center gap-2"><Trophy size={24} className="text-yellow-500" /> 獎項清單 PRIZES</h3>
                                     <span className="text-xs font-bold bg-pink-200 text-pink-700 px-2 py-1 rounded">{currentScene.prizes.reduce((acc, p) => acc + p.count, 0)} items left</span>
                                 </div>
@@ -764,8 +776,8 @@
                                 </div>
                             </div>
                             {/* Winner History */}
-                            <div className="flex-1 bg-gray-50 rounded-3xl p-1 border-2 border-gray-200 flex flex-col h-[320px]">
-                                <div className="bg-gray-100 p-4 rounded-t-[20px] border-b-2 border-gray-200">
+                            <div className="flex-1 min-h-0 bg-gray-50 rounded-3xl p-1 border-2 border-gray-200 flex flex-col">
+                                <div className="bg-gray-100 p-4 rounded-t-[20px] flex-none border-b-2 border-gray-200">
                                     <h3 className="font-black text-xl text-gray-600 flex items-center gap-2"><Users size={24} className="text-gray-500"/> {currentPrize ? `${currentPrize.name} 得主` : '中獎紀錄'}</h3>
                                 </div>
                                 <ul className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -787,7 +799,7 @@
                         </div>
                     </main>
 
-                    {/* Modals */}
+                    {/* Modals... (Same as before) */}
                     
                     {/* Admin Login */}
                     {showAdminLogin && (
@@ -971,49 +983,25 @@
                     {/* Small Redraw Modal */}
                     {showRedrawModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            {/* 修改：比照中獎視窗的巨大化與自適應設定 */}
                             <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(236,72,153,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
-                                
-                                {/* 頂部圖示：放大並調整位置 */}
                                 <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
                                     <RefreshCw size={36} className="text-white md:hidden animate-spin-slow" />
                                     <RefreshCw size={72} className="text-white hidden md:block animate-spin-slow" />
                                 </div>
-                                
-                                {/* 內容捲動區 */}
                                 <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
-                                    
                                     <div className="text-pink-400 font-black uppercase tracking-widest text-sm md:text-xl mb-2 md:mb-4 mt-4 md:mt-0">
                                         {isRedrawSpinning ? "REROLLING..." : "NEW WINNER!"}
                                     </div>
-                                    
                                     {isRedrawSpinning ? (
                                         <div className="w-full flex flex-col items-center justify-center flex-1 min-h-[200px]">
-                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black text-gray-300 animate-pulse truncate py-2">
-                                                {redrawDisplay?.name}
-                                            </div>
-                                            <div className="text-lg md:text-2xl font-bold text-gray-300 mt-2 tracking-widest">
-                                                {redrawDisplay?.group}
-                                            </div>
+                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black text-gray-300 animate-pulse truncate py-2">{redrawDisplay?.name}</div>
+                                            <div className="text-lg md:text-2xl font-bold text-gray-300 mt-2 tracking-widest">{redrawDisplay?.group}</div>
                                         </div>
                                     ) : (
                                         <div className="w-full flex flex-col items-center animate-pop flex-1 justify-center">
-                                            {/* 名字：微調最大字體 (9xl -> 8xl) */}
-                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-2 text-center w-full">
-                                                {redrawDisplay?.name}
-                                            </div>
-                                            {/* 部門 */}
-                                            <div className="text-lg md:text-2xl font-bold gold-text-impact mb-8 tracking-widest opacity-90 text-center w-full">
-                                                {redrawDisplay?.group}
-                                            </div>
-                                            
-                                            {/* 確認按鈕：放大 */}
-                                            <button 
-                                                onClick={confirmWin}
-                                                className="w-full max-w-md bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2 mt-auto"
-                                            >
-                                                <CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下
-                                            </button>
+                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-2 text-center w-full">{redrawDisplay?.name}</div>
+                                            <div className="text-lg md:text-2xl font-bold gold-text-impact mb-8 tracking-widest opacity-90 text-center w-full">{redrawDisplay?.group}</div>
+                                            <button onClick={confirmWin} className="w-full max-w-md bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2 mt-auto"><CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下</button>
                                         </div>
                                     )}
                                 </div>
@@ -1024,57 +1012,22 @@
                     {/* Main Winner Modal */}
                     {showWinnerModal && lastWinner && !showRedrawModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            {/* 修改：
-                                1. 加入 style={{transform: 'scale(0.97)'}} 進行 3% 縮放
-                                2. max-h-[90vh] 讓視窗稍微再矮一點點，避免貼邊
-                                3. 稍微縮小圓角與內距
-                            */}
-                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(250,204,21,0.8)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
-                                
-                                {/* 獎盃：微調位置與大小 */}
+                            <div className="bg-white rounded-[32px] md:rounded-[60px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(250,204,21,0.8)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
                                 <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
                                     <Trophy size={36} className="text-white md:hidden" strokeWidth={2.5} />
                                     <Trophy size={72} className="text-white hidden md:block" strokeWidth={2.5} />
                                 </div>
-                                
-                                {/* 內容捲動區：微調內距與字體大小 */}
                                 <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
-                                    
-                                    {/* 標題 */}
                                     <h2 className="text-lg md:text-3xl font-black text-gray-300 mb-1 md:mb-3 uppercase tracking-[0.2em] text-center w-full mt-4 md:mt-0">Winner!</h2>
-                                    
-                                    {/* 名字：微調最大字體 (9xl -> 8xl) */}
-                                    <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-1 text-center w-full">
-                                        {lastWinner?.person?.name}
-                                    </div>
-                                    
-                                    {/* 部門 */}
-                                    <div className="text-lg md:text-2xl font-bold gold-text-impact mb-3 md:mb-6 tracking-widest opacity-90 text-center w-full">
-                                        {lastWinner?.person?.group || '一般'}
-                                    </div>
-                                    
-                                    {/* 獎品框：微調內距與字體 */}
+                                    <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-1 text-center w-full">{lastWinner?.person?.name}</div>
+                                    <div className="text-lg md:text-2xl font-bold gold-text-impact mb-3 md:mb-6 tracking-widest opacity-90 text-center w-full">{lastWinner?.person?.group || '一般'}</div>
                                     <div className="bg-pink-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-3 md:mb-6 border-[3px] md:border-[5px] border-pink-100 shadow-inner w-full text-center">
                                         <div className="text-xs md:text-base text-pink-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
-                                        <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">
-                                            {lastWinner.prize.name}
-                                        </div>
+                                        <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">{lastWinner.prize.name}</div>
                                     </div>
-
-                                    {/* 按鈕組：微調大小 */}
                                     <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full mt-auto">
-                                        <button 
-                                            onClick={confirmWin}
-                                            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"
-                                        >
-                                            <CheckCircle className="w-5 h-5 md:w-7 md:h-7"/> 開心收下 🎉
-                                        </button>
-                                        <button 
-                                            onClick={handleRedrawClick}
-                                            className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"
-                                        >
-                                            <RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 再抽一次 🔄
-                                        </button>
+                                        <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-7 md:h-7"/> 開心收下 🎉</button>
+                                        <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 再抽一次 🔄</button>
                                     </div>
                                 </div>
                             </div>
