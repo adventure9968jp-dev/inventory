@@ -160,6 +160,8 @@
         const Undo2 = (props) => (<Icon {...props}><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></Icon>);
         const Redo2 = (props) => (<Icon {...props}><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/></Icon>);
         const FileSpreadsheet = (props) => (<Icon {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></Icon>);
+        const Coins = (props) => (<Icon {...props}><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m7.1 13.84.3-1.8" /></Icon>);
+        const Pencil = (props) => (<Icon {...props}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></Icon>);
 
         // 預設資料
         const DEFAULT_SCENES = [
@@ -175,8 +177,8 @@
                     { id: 6, name: '老闆', group: '管理層', active: false, won: false },
                 ],
                 prizes: [
-                    { id: 1, name: '現金 $1000', count: 3 },
-                    { id: 2, name: '特休一日券', count: 1 },
+                    { id: 1, name: '現金 $1000', count: 3, value: 1000 },
+                    { id: 2, name: '特休一日券', count: 1, value: 0 },
                 ],
                 history: [],
                 weights: {}
@@ -190,7 +192,7 @@
                     { id: 3, name: 'PM C', group: '產品處', active: true, won: false },
                 ],
                 prizes: [
-                    { id: 1, name: 'iPhone 15', count: 1 },
+                    { id: 1, name: 'iPhone 15', count: 1, value: 29900 },
                 ],
                 history: [],
                 weights: {}
@@ -262,16 +264,15 @@
             const [isRedrawSpinning, setIsRedrawSpinning] = useState(false);
             const [redrawDisplay, setRedrawDisplay] = useState(null);
             const [redrawSelectedGroups, setRedrawSelectedGroups] = useState(new Set());
-            // 新增：暫存重抽目標，用於「再重抽一次」
             const [currentRedrawTarget, setCurrentRedrawTarget] = useState(null);
             
             const [newNameList, setNewNameList] = useState('');
             const [newGroupName, setNewGroupName] = useState('一般'); 
             const [newPrizeName, setNewPrizeName] = useState('');
             const [newPrizeCount, setNewPrizeCount] = useState(1);
+            const [newPrizeValue, setNewPrizeValue] = useState(0); 
             
             const [dragOverGroup, setDragOverGroup] = useState(null);
-
             const [visibleGroups, setVisibleGroups] = useState(new Set()); 
 
             const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -279,6 +280,9 @@
             const [adminPasswordInput, setAdminPasswordInput] = useState('');
             const [loginError, setLoginError] = useState(false);
             const [adminTargetPrizeId, setAdminTargetPrizeId] = useState(null);
+
+            // Edit Prize State
+            const [editingPrize, setEditingPrize] = useState(null);
 
             const timerRef = useRef(null);
             const fileInputRef = useRef(null); 
@@ -310,6 +314,15 @@
                 });
                 return groups;
             }, [currentScene.participants]);
+
+            const totalWonValue = useMemo(() => {
+                return currentScene.history.reduce((acc, curr) => acc + (curr.prizeValue || 0), 0);
+            }, [currentScene.history]);
+
+            const totalAmount = useMemo(() => {
+                const remaining = currentScene.prizes.reduce((acc, curr) => acc + (curr.count * (curr.value || 0)), 0);
+                return remaining + totalWonValue;
+            }, [currentScene.prizes, totalWonValue]);
 
             const toggleGroupVisibility = (groupName) => {
                 const newVisible = new Set(visibleGroups);
@@ -353,7 +366,7 @@
                                 ...s,
                                 weights: s.weights || {}
                             }));
-                            setScenes(safeScenes); // History handled by wrapper
+                            setScenes(safeScenes);
                             if (!safeScenes.find(s => s.id === activeSceneId)) {
                                 setActiveSceneId(safeScenes[0]?.id || 'scene-1');
                             }
@@ -444,9 +457,9 @@
                 }
                 try {
                     const wb = XLSX.utils.book_new();
-                    const allWinnersData = [["獎項名稱", "得獎者", "部門", "中獎時間"]];
+                    const allWinnersData = [["獎項名稱", "得獎者", "部門", "中獎時間", "價值"]];
                     currentScene.history.forEach(h => {
-                        allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time]);
+                        allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time, h.prizeValue || 0]);
                     });
                     const wsAll = XLSX.utils.aoa_to_sheet(allWinnersData);
                     XLSX.utils.book_append_sheet(wb, wsAll, "總覽");
@@ -454,9 +467,9 @@
                     const prizesInHistory = [...new Set(currentScene.history.map(h => h.prizeName))];
                     prizesInHistory.forEach(prizeName => {
                         const winners = currentScene.history.filter(h => h.prizeName === prizeName);
-                        const sheetData = [["得獎者", "部門", "中獎時間"]];
+                        const sheetData = [["得獎者", "部門", "中獎時間", "價值"]];
                         winners.forEach(w => {
-                            sheetData.push([w.personName, w.personGroup || '', w.time]);
+                            sheetData.push([w.personName, w.personGroup || '', w.time, w.prizeValue || 0]);
                         });
                         const ws = XLSX.utils.aoa_to_sheet(sheetData);
                         const safeName = prizeName.replace(/[\\/?*\[\]]/g, '').substring(0, 30);
@@ -554,7 +567,7 @@
                     const updatedPrizes = scene.prizes.map(p => p.id === prize.id ? { ...p, count: p.count - 1 } : p);
                     const newHistory = [{
                         time: new Date().toLocaleTimeString('en-US', {hour12: false, hour: "numeric", minute: "numeric", second: "numeric"}),
-                        personName: winner.name, personGroup: winner.group, prizeName: prize.name, prizeId: prize.id
+                        personName: winner.name, personGroup: winner.group, prizeName: prize.name, prizeId: prize.id, prizeValue: prize.value || 0
                     }, ...scene.history];
                     return { ...scene, participants: updatedParticipants, prizes: updatedPrizes, history: newHistory };
                 }));
@@ -602,13 +615,27 @@
                      return;
                 }
 
-                const candidates = currentScene.participants.filter(p => 
-                    p.active && 
-                    !p.won && 
-                    targetGroups.has(p.group || '未分類')
-                );
-                
-                if (candidates.length === 0) { alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); return; }
+                setCurrentRedrawTarget(targetGroups);
+
+                let candidates;
+                if (targetGroups === 'ALL') {
+                     candidates = currentScene.participants.filter(p => 
+                        p.active && 
+                        !p.won && 
+                        visibleGroups.has(p.group || '未分類')
+                    );
+                } else if (targetGroups instanceof Set) {
+                    candidates = currentScene.participants.filter(p => 
+                        p.active && 
+                        !p.won && 
+                        targetGroups.has(p.group || '未分類')
+                    );
+                } else { return; }
+
+                if (candidates.length === 0) { 
+                    alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); 
+                    return; 
+                }
                 
                 const winner = getWeightedWinner(candidates, currentPrize.id);
                 if (!winner) { 
@@ -637,11 +664,9 @@
                 }, 2500);
             };
             
-            // 重新開啟部門選擇選單 (用於「再重抽一次」按鈕)
             const reopenRedrawMenu = () => {
-                setShowRedrawModal(false); // 關閉結果
-                setShowRedrawMenu(true);   // 開啟選單
-                // 保留之前的選取狀態 redrawSelectedGroups 不清空，方便使用者直接按開始
+                setShowRedrawModal(false); 
+                setShowRedrawMenu(true);   
             };
 
             const toggleParticipantActive = (pId) => {
@@ -716,14 +741,51 @@
                 if (!newPrizeName.trim()) return;
                 setScenes(prev => prev.map(scene => {
                     if (scene.id !== activeSceneId) return scene;
-                    return { ...scene, prizes: [...scene.prizes, { id: Date.now(), name: newPrizeName, count: parseInt(newPrizeCount) }] };
+                    return { ...scene, prizes: [...scene.prizes, { id: Date.now(), name: newPrizeName, count: parseInt(newPrizeCount), value: parseInt(newPrizeValue) || 0 }] };
                 }));
-                setNewPrizeName(''); setNewPrizeCount(1);
+                setNewPrizeName(''); setNewPrizeCount(1); setNewPrizeValue(0);
             };
 
             const updateSceneTitle = (title) => {
                  setScenes(prev => prev.map(scene => { if (scene.id !== activeSceneId) return scene; return { ...scene, title }; }));
             }
+            
+            // Edit Prize Functions
+            const openEditPrize = (prize) => {
+                setEditingPrize({ ...prize }); // Copy prize data to editing state
+            };
+
+            const closeEditPrize = () => {
+                setEditingPrize(null);
+            };
+
+            const handleUpdatePrize = () => {
+                if (!editingPrize || !editingPrize.name.trim()) return;
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    const updatedPrizes = scene.prizes.map(p => 
+                        p.id === editingPrize.id ? { ...p, name: editingPrize.name, count: parseInt(editingPrize.count), value: parseInt(editingPrize.value) || 0 } : p
+                    );
+                    return { ...scene, prizes: updatedPrizes };
+                }));
+                closeEditPrize();
+            };
+
+            const handleDeletePrize = () => {
+                if (!editingPrize) return;
+                if (!confirm("確定要刪除這個獎項嗎？")) return;
+                
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    const updatedPrizes = scene.prizes.filter(p => p.id !== editingPrize.id);
+                    return { ...scene, prizes: updatedPrizes };
+                }));
+                closeEditPrize();
+                // Also reset selected prize if it was the deleted one
+                if (selectedPrizeId === editingPrize.id) {
+                    setSelectedPrizeId(null);
+                }
+            };
 
             return (
                 <div className="h-screen flex flex-col p-2 md:p-6 max-w-[1600px] mx-auto w-full">
@@ -754,7 +816,7 @@
                         </div>
                     </div>
 
-                    {/* Main Content Area - Updated for responsive layout without body scroll */}
+                    {/* Main Content Area */}
                     <main className="impact-panel flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 p-4 relative overflow-hidden">
                         {/* Left: The Wheel */}
                         <div className="lg:col-span-7 flex flex-col items-center justify-center h-full min-h-0 overflow-y-auto lg:overflow-visible">
@@ -795,16 +857,27 @@
                                     <h3 className="font-black text-xl text-red-600 flex items-center gap-2"><Trophy size={24} className="text-yellow-500" /> 獎項清單 PRIZES</h3>
                                     <span className="text-xs font-bold bg-red-200 text-red-700 px-2 py-1 rounded">{currentScene.prizes.reduce((acc, p) => acc + p.count, 0)} items left</span>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                                     {currentScene.prizes.map((prize, idx) => {
                                         const isActivePrize = currentPrize && currentPrize.id === prize.id;
                                         return (
-                                            <div key={prize.id} onClick={() => setSelectedPrizeId(prize.id)} className={`relative p-4 rounded-xl flex justify-between items-center transition-all cursor-pointer ${prize.count === 0 ? 'bg-gray-100 border-2 border-gray-200 opacity-60 grayscale' : (isActivePrize ? 'selected-prize-card' : 'bg-white list-card-shadow')}`}>
+                                            <div key={prize.id} onClick={() => setSelectedPrizeId(prize.id)} className={`relative px-4 py-2 rounded-lg flex justify-between items-center transition-all cursor-pointer group ${prize.count === 0 ? 'bg-gray-100 border-2 border-gray-200 opacity-60 grayscale' : (isActivePrize ? 'selected-prize-card' : 'bg-white list-card-shadow')}`}>
                                                 <div className="flex flex-col">
                                                     <span className={`font-black text-lg ${prize.count === 0 ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{prize.name}</span>
-                                                    {isActivePrize && prize.count > 0 && <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider mt-1">Current Target</span>}
+                                                    {isActivePrize && prize.count > 0 && <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Current Target</span>}
                                                 </div>
-                                                <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
+                                                
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-10 h-8 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
+                                                    {/* Edit Button */}
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); openEditPrize(prize); }}
+                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="修改獎項"
+                                                    >
+                                                        <Pencil size={16} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -825,7 +898,10 @@
                                                 <span className="font-black text-lg text-gray-800 gold-text-impact">{record.personName}</span>
                                                 {record.personGroup && <span className="text-xs text-gray-400 font-bold gold-text-impact">{record.personGroup}</span>}
                                             </div>
-                                            <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">{record.prizeName}</span>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">{record.prizeName}</span>
+                                                {record.prizeValue > 0 && <span className="text-[10px] text-gray-400 mt-1 font-bold">${record.prizeValue.toLocaleString()}</span>}
+                                            </div>
                                         </li>
                                     ))}
                                     {currentScene.history.filter(record => !currentPrize || record.prizeId === currentPrize.id).length === 0 && (
@@ -833,10 +909,72 @@
                                     )}
                                 </ul>
                             </div>
+                            
+                            {/* Summary Card */}
+                            <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-red-100 flex justify-between items-center mt-auto flex-none">
+                                <div>
+                                    <div className="text-gray-400 text-xs font-bold uppercase flex items-center gap-1"><Coins size={14}/> 總計金額</div>
+                                    <div className="text-2xl font-black text-gray-800">${totalAmount.toLocaleString()}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-red-500 text-xs font-bold uppercase">目前抽出</div>
+                                    <div className="text-2xl font-black text-red-600">${totalWonValue.toLocaleString()}</div>
+                                </div>
+                            </div>
                         </div>
                     </main>
 
                     {/* Modals */}
+
+                    {/* Edit Prize Modal */}
+                    {editingPrize && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeEditPrize}>
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-pop border-2 border-red-200" onClick={e => e.stopPropagation()}>
+                                <h3 className="font-black text-xl text-gray-800 mb-4 flex items-center gap-2"><Pencil size={20}/> 修改獎項</h3>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">獎項名稱</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none"
+                                            value={editingPrize.name}
+                                            onChange={e => setEditingPrize({...editingPrize, name: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-gray-500 mb-1">金額</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none"
+                                                min="0"
+                                                value={editingPrize.value}
+                                                onChange={e => setEditingPrize({...editingPrize, value: e.target.value})}
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-gray-500 mb-1">數量</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none"
+                                                min="0"
+                                                value={editingPrize.count}
+                                                onChange={e => setEditingPrize({...editingPrize, count: e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 mt-6">
+                                    <button onClick={handleDeletePrize} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 transition">刪除</button>
+                                    <div className="flex-1"></div>
+                                    <button onClick={closeEditPrize} className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition">取消</button>
+                                    <button onClick={handleUpdatePrize} className="bg-red-500 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-600 transition shadow-md">儲存</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     
                     {/* Admin Login */}
                     {showAdminLogin && (
@@ -906,45 +1044,93 @@
                                     <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-200 rounded-full transition"><X/></button>
                                 </div>
                                 <div className="p-8 overflow-y-auto flex-1 space-y-8">
+                                    {/* Add Participants with Group */}
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
                                             <h3 className="font-bold text-gray-900 flex items-center gap-2"><Plus size={18}/> 快速新增人員</h3>
                                             <div className="flex gap-2">
-                                                <button onClick={handleExportParticipants} className="flex items-center gap-1 text-xs font-bold text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 px-3 py-1.5 rounded-lg transition" title="下載目前的 CSV，可用於 Excel 編輯"><Download size={14}/> 匯出名單 (含格式)</button>
-                                                <button onClick={() => participantsInputRef.current.click()} className="flex items-center gap-1 text-xs font-bold text-white bg-pink-500 hover:bg-pink-600 px-3 py-1.5 rounded-lg transition shadow-sm" title="上傳 CSV 檔案加入名單"><Upload size={14}/> 匯入名單</button>
+                                                <button onClick={handleExportParticipants} className="flex items-center gap-1 text-xs font-bold text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition" title="下載目前的 CSV，可用於 Excel 編輯"><Download size={14}/> 匯出名單 (含格式)</button>
+                                                <button onClick={() => participantsInputRef.current.click()} className="flex items-center gap-1 text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition shadow-sm" title="上傳 CSV 檔案加入名單"><Upload size={14}/> 匯入名單</button>
                                             </div>
                                         </div>
                                         <div className="flex flex-col gap-3 bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm font-bold text-gray-500">部門/群組:</span>
-                                                <input type="text" className="border-2 border-gray-200 rounded-lg p-2 text-sm w-40 focus:border-pink-500 focus:outline-none" placeholder="例如: 業務部" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} />
+                                                <input type="text" className="border-2 border-gray-200 rounded-lg p-2 text-sm w-40 focus:border-red-500 focus:outline-none" placeholder="例如: 業務部" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} />
                                             </div>
                                             <div className="flex gap-3">
-                                                <textarea className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-pink-500 focus:outline-none transition-colors" rows="3" placeholder="貼上名單，一行一個名字..." value={newNameList} onChange={e => setNewNameList(e.target.value)}></textarea>
+                                                <textarea className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-red-500 focus:outline-none transition-colors" rows="3" placeholder="貼上名單，一行一個名字..." value={newNameList} onChange={e => setNewNameList(e.target.value)}></textarea>
                                                 <button onClick={handleAddNames} className="bg-gray-900 text-white px-6 rounded-xl font-bold hover:bg-black whitespace-nowrap shadow-lg">新增</button>
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Add Prizes */}
                                     <div>
                                         <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Gift size={18}/> 新增獎項</h3>
-                                        <div className="flex gap-3 items-center">
-                                            <input type="text" placeholder="獎品名稱" className="border-2 border-gray-200 p-3 rounded-xl flex-1 focus:border-pink-500 focus:outline-none font-bold text-gray-700" value={newPrizeName} onChange={e => setNewPrizeName(e.target.value)} />
-                                            <input type="number" placeholder="數量" className="border-2 border-gray-200 p-3 rounded-xl w-24 focus:border-pink-500 focus:outline-none font-bold text-center" min="1" value={newPrizeCount} onChange={e => setNewPrizeCount(e.target.value)} />
-                                            <button onClick={addPrize} className="bg-yellow-400 text-yellow-900 px-6 py-3 rounded-xl font-black hover:bg-yellow-500 whitespace-nowrap shadow-md uppercase tracking-wide">Add</button>
+                                        <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
+                                            <div className="flex gap-2 mb-2">
+                                                <div className="flex-1">
+                                                    <label className="text-xs text-gray-500 font-bold ml-1">獎項名稱</label>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="例: 頭獎" 
+                                                        className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-gray-700" 
+                                                        value={newPrizeName} 
+                                                        onChange={e => setNewPrizeName(e.target.value)} 
+                                                    />
+                                                </div>
+                                                <div className="w-24">
+                                                    <label className="text-xs text-gray-500 font-bold ml-1">金額</label>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="0" 
+                                                        className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-center" 
+                                                        min="0" 
+                                                        value={newPrizeValue} 
+                                                        onChange={e => setNewPrizeValue(e.target.value)} 
+                                                    />
+                                                </div>
+                                                <div className="w-20">
+                                                    <label className="text-xs text-gray-500 font-bold ml-1">數量</label>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="1" 
+                                                        className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-center" 
+                                                        min="1" 
+                                                        value={newPrizeCount} 
+                                                        onChange={e => setNewPrizeCount(e.target.value)} 
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex justify-between items-center mt-2">
+                                                <div className="text-gray-400 text-xs font-bold">
+                                                    預估總額: <span className="text-gray-600">${((parseInt(newPrizeValue) || 0) * (parseInt(newPrizeCount) || 0)).toLocaleString()}</span>
+                                                </div>
+                                                <button 
+                                                    onClick={addPrize} 
+                                                    className="bg-yellow-400 text-yellow-900 px-6 py-2 rounded-lg font-black hover:bg-yellow-500 whitespace-nowrap shadow-md uppercase tracking-wide text-sm"
+                                                >
+                                                    新增獎項
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {/* Manage Participants (Grouped) */}
                                     <div>
                                         <div className="flex justify-between items-end mb-4">
                                             <div>
                                                 <h3 className="font-bold text-gray-900">名單管理</h3>
                                                 <span className="text-xs font-bold bg-gray-200 px-2 py-1 rounded text-gray-600">{currentScene.participants.length} 人</span>
                                             </div>
-                                            <button onClick={toggleAllGroups} className="text-xs font-bold text-pink-500 hover:text-pink-600 underline">{visibleGroups.size === Object.keys(groupedParticipants).length ? '全部收起' : '全部顯示'}</button>
+                                            <button onClick={toggleAllGroups} className="text-xs font-bold text-red-500 hover:text-red-600 underline">{visibleGroups.size === Object.keys(groupedParticipants).length ? '全部收起' : '全部顯示'}</button>
                                         </div>
                                         <div className="flex flex-wrap gap-2 mb-6 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
                                             {Object.keys(groupedParticipants).length === 0 && <div className="text-gray-400 text-sm">暫無群組</div>}
                                             {Object.keys(groupedParticipants).map(groupName => (
-                                                <button key={groupName} onClick={() => toggleGroupVisibility(groupName)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${visibleGroups.has(groupName) ? 'bg-pink-500 text-white border-pink-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-gray-300 hover:border-pink-300'}`}>
+                                                <button key={groupName} onClick={() => toggleGroupVisibility(groupName)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${visibleGroups.has(groupName) ? 'bg-red-500 text-white border-red-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-gray-300 hover:border-red-300'}`}>
                                                     {visibleGroups.has(groupName) ? <CheckCircle size={12} className="text-white"/> : <div className="w-3 h-3 rounded-full border border-gray-400"></div>}
                                                     {groupName}
                                                 </button>
@@ -956,15 +1142,15 @@
                                                 .map(([groupName, participants]) => (
                                                 <div key={groupName} className={`bg-white rounded-xl border-2 overflow-hidden transition-all animate-pop ${dragOverGroup === groupName ? 'drag-over' : 'border-gray-100'}`} onDragOver={(e) => handleDragOver(e, groupName)} onDrop={(e) => handleDrop(e, groupName)}>
                                                     <div className="bg-gray-50 px-4 py-2 font-black text-gray-700 flex items-center gap-2 border-b-2 border-gray-100">
-                                                        <Building size={16} className="text-pink-500"/>
+                                                        <Building size={16} className="text-red-500"/>
                                                         {groupName}
                                                         <span className="text-xs font-normal text-gray-400 ml-auto">{participants.length} 人</span>
                                                     </div>
                                                     <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                         {participants.map(p => (
-                                                            <div key={p.id} draggable="true" onDragStart={(e) => handleDragStart(e, p.id)} onDragEnd={(e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); }} className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all relative group cursor-move ${p.won ? 'bg-gray-100 border-gray-100 opacity-50' : 'bg-white border-gray-100 hover:border-pink-200 hover:shadow-sm'}`}>
+                                                            <div key={p.id} draggable="true" onDragStart={(e) => handleDragStart(e, p.id)} onDragEnd={(e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); }} className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all relative group cursor-move ${p.won ? 'bg-gray-100 border-gray-100 opacity-50' : 'bg-white border-gray-100 hover:border-red-200 hover:shadow-sm'}`}>
                                                                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                                    <input type="checkbox" checked={p.active} disabled={p.won} onChange={() => toggleParticipantActive(p.id)} className="w-4 h-4 accent-pink-600 rounded shrink-0 cursor-pointer" onClick={(e) => e.stopPropagation()} />
+                                                                    <input type="checkbox" checked={p.active} disabled={p.won} onChange={() => toggleParticipantActive(p.id)} className="w-4 h-4 accent-red-600 rounded shrink-0 cursor-pointer" onClick={(e) => e.stopPropagation()} />
                                                                     <span className={`font-bold truncate text-sm ${!p.active ? 'line-through text-gray-400' : 'text-gray-700'}`}>{p.name}</span>
                                                                 </div>
                                                                 {!p.won && (
@@ -986,7 +1172,7 @@
                                     </div>
                                 </div>
                                 <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-                                    <button onClick={() => { setShowSettings(false); setShowRedrawMenu(true); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-pink-200 text-pink-600 rounded-xl hover:bg-pink-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
+                                    <button onClick={() => { setShowSettings(false); setShowRedrawMenu(true); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
                                     <button onClick={() => setShowSettings(false)} className="px-8 py-3 bg-gray-900 text-white rounded-xl hover:bg-black font-bold shadow-lg">完成設定</button>
                                 </div>
                             </div>
@@ -997,20 +1183,20 @@
                     {showRedrawMenu && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleRedrawCancel}>
                             <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center relative shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
-                                <h3 className="text-2xl font-black text-gray-800 mb-2 flex items-center justify-center gap-2"><RefreshCw className="text-pink-500"/> 選擇重抽範圍</h3>
+                                <h3 className="text-2xl font-black text-gray-800 mb-2 flex items-center justify-center gap-2"><RefreshCw className="text-red-500"/> 選擇重抽範圍</h3>
                                 <div className="flex justify-end mb-2">
-                                     <button onClick={selectAllRedrawGroups} className="text-sm font-bold text-pink-500 hover:underline">{redrawSelectedGroups.size === Object.keys(groupedParticipants).length ? '取消全選' : '全選'}</button>
+                                     <button onClick={selectAllRedrawGroups} className="text-sm font-bold text-red-500 hover:underline">{redrawSelectedGroups.size === Object.keys(groupedParticipants).length ? '取消全選' : '全選'}</button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto overflow-x-hidden p-1 mb-6">
                                     {Object.keys(groupedParticipants).map(groupName => (
-                                        <button key={groupName} onClick={() => toggleRedrawGroup(groupName)} className={`py-3 rounded-lg border-2 font-bold transition flex items-center justify-center gap-2 ${redrawSelectedGroups.has(groupName) ? 'bg-pink-500 text-white border-pink-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-pink-100 hover:border-pink-300'}`}>
+                                        <button key={groupName} onClick={() => toggleRedrawGroup(groupName)} className={`py-3 rounded-lg border-2 font-bold transition flex items-center justify-center gap-2 ${redrawSelectedGroups.has(groupName) ? 'bg-red-500 text-white border-red-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-red-100 hover:border-red-300'}`}>
                                             {redrawSelectedGroups.has(groupName) && <CheckCircle size={16} />}
                                             {groupName}
                                         </button>
                                     ))}
                                 </div>
                                 <div className="flex gap-3">
-                                    <button onClick={() => executeRedraw(redrawSelectedGroups)} className="flex-1 bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-xl font-bold hover:brightness-110 shadow-lg transition">開始重抽</button>
+                                    <button onClick={() => executeRedraw(redrawSelectedGroups)} className="flex-1 bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold hover:brightness-110 shadow-lg transition">開始重抽</button>
                                     <button onClick={handleRedrawCancel} className="flex-1 bg-gray-200 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-300 transition">取消</button>
                                 </div>
                             </div>
@@ -1020,14 +1206,13 @@
                     {/* Small Redraw Modal */}
                     {showRedrawModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            {/* Reusing Winner Modal Styles */}
-                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(236,72,153,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
-                                <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
+                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(239,68,68,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
+                                <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-red-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
                                     <RefreshCw size={36} className="text-white md:hidden animate-spin-slow" />
                                     <RefreshCw size={72} className="text-white hidden md:block animate-spin-slow" />
                                 </div>
                                 <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
-                                    <div className="text-pink-400 font-black uppercase tracking-widest text-sm md:text-xl mb-2 md:mb-4 mt-4 md:mt-0">
+                                    <div className="text-red-400 font-black uppercase tracking-widest text-sm md:text-xl mb-2 md:mb-4 mt-4 md:mt-0">
                                         {isRedrawSpinning ? "REROLLING..." : "NEW WINNER!"}
                                     </div>
                                     {isRedrawSpinning ? (
@@ -1040,8 +1225,8 @@
                                             <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-2 text-center w-full">{redrawDisplay?.name}</div>
                                             <div className="text-lg md:text-2xl font-bold gold-text-impact mb-6 tracking-widest opacity-90 text-center w-full">{redrawDisplay?.group}</div>
                                             
-                                            <div className="bg-pink-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-6 border-[3px] md:border-[5px] border-pink-100 shadow-inner w-full text-center max-w-3xl">
-                                                <div className="text-xs md:text-base text-pink-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
+                                            <div className="bg-red-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-6 border-[3px] md:border-[5px] border-red-100 shadow-inner w-full text-center max-w-3xl">
+                                                <div className="text-xs md:text-base text-red-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
                                                 <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">
                                                     {lastWinner?.prize?.name}
                                                 </div>
@@ -1049,7 +1234,6 @@
 
                                             <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full max-w-2xl mt-auto">
                                                 <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下</button>
-                                                {/* Reopen Redraw Menu Loop */}
                                                 <button onClick={reopenRedrawMenu} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-8 md:h-8"/> 再試一次</button>
                                             </div>
                                         </div>
@@ -1062,31 +1246,19 @@
                     {/* Main Winner Modal */}
                     {showWinnerModal && lastWinner && !showRedrawModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            {/* Responsive Modal Container */}
-                            <div className="bg-white rounded-[32px] md:rounded-[60px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(250,204,21,0.8)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
+                            <div className="bg-white rounded-[40px] md:rounded-[60px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(250,204,21,0.8)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
                                 <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
                                     <Trophy size={36} className="text-white md:hidden" strokeWidth={2.5} />
                                     <Trophy size={72} className="text-white hidden md:block" strokeWidth={2.5} />
                                 </div>
                                 <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
                                     <h2 className="text-lg md:text-3xl font-black text-gray-300 mb-1 md:mb-3 uppercase tracking-[0.2em] text-center w-full mt-4 md:mt-0">Winner!</h2>
-                                    
-                                    {/* Responsive Text Size using vmin/vmax logic via Tailwind classes */}
-                                    <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-1 text-center w-full">
-                                        {lastWinner?.person?.name}
+                                    <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-1 text-center w-full">{lastWinner?.person?.name}</div>
+                                    <div className="text-lg md:text-2xl font-bold gold-text-impact mb-3 md:mb-6 tracking-widest opacity-90 text-center w-full">{lastWinner?.person?.group || '一般'}</div>
+                                    <div className="bg-red-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-3 md:mb-6 border-[3px] md:border-[5px] border-red-100 shadow-inner w-full text-center">
+                                        <div className="text-xs md:text-base text-red-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
+                                        <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">{lastWinner.prize.name}</div>
                                     </div>
-                                    
-                                    <div className="text-lg md:text-2xl font-bold gold-text-impact mb-3 md:mb-6 tracking-widest opacity-90 text-center w-full">
-                                        {lastWinner?.person?.group || '一般'}
-                                    </div>
-                                    
-                                    <div className="bg-pink-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-3 md:mb-6 border-[3px] md:border-[5px] border-pink-100 shadow-inner w-full text-center max-w-3xl">
-                                        <div className="text-xs md:text-base text-pink-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
-                                        <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">
-                                            {lastWinner.prize.name}
-                                        </div>
-                                    </div>
-
                                     <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full mt-auto">
                                         <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-7 md:h-7"/> 開心收下 🎉</button>
                                         <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 再抽一次 🔄</button>
