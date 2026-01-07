@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>✨ 幸運轉盤 - 衝擊版</title>
+    <title>🧧 幸運轉盤 - 喜氣洋洋版</title>
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -13,21 +13,21 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Confetti -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- SheetJS (XLSX) for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap');
         
         body {
             font-family: 'Zen Maru Gothic', sans-serif;
-            background: radial-gradient(circle at center, #fce7f3 0%, #fbcfe8 100%);
-            /* 修改：設定固定高度 100vh 並隱藏捲軸 */
+            background: radial-gradient(circle at center, #fff1f2 0%, #ffe4e6 100%);
             height: 100vh;
             overflow: hidden;
             margin: 0;
             padding: 0;
         }
 
-        /* 手機版恢復捲動，避免內容被截斷 */
         @media (max-width: 1024px) {
             body {
                 height: auto;
@@ -39,26 +39,26 @@
 
         .impact-panel {
             background: rgba(255, 255, 255, 0.95);
-            border: 4px solid #F472B6;
-            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5), 0 20px 40px -5px rgba(236, 72, 153, 0.4);
+            border: 4px solid #F87171; /* Red-400 */
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5), 0 20px 40px -5px rgba(220, 38, 38, 0.3);
             border-radius: 24px;
         }
 
         .list-card-shadow {
-            box-shadow: 4px 4px 0px 0px #FBBF24;
-            border: 2px solid #F59E0B;
+            box-shadow: 4px 4px 0px 0px #DC2626; /* Red-600 */
+            border: 2px solid #EF4444; /* Red-500 */
             transition: all 0.1s;
         }
         
         .list-card-shadow:active {
             transform: translate(2px, 2px);
-            box-shadow: 0px 0px 0px 0px #FBBF24;
+            box-shadow: 0px 0px 0px 0px #DC2626;
         }
 
         .selected-prize-card {
-            border: 3px solid #ec4899 !important;
-            box-shadow: 0 0 0 2px #fbcfe8, 4px 4px 0px 0px #ec4899 !important;
-            background-color: #fff1f2 !important;
+            border: 3px solid #E11D48 !important; /* Rose-600 */
+            box-shadow: 0 0 0 2px #ffe4e6, 4px 4px 0px 0px #E11D48 !important;
+            background-color: #fff1f2 !important; /* Rose-50 */
             transform: scale(1.02);
         }
 
@@ -114,22 +114,22 @@
         }
         
         .drag-over {
-            border-color: #3b82f6 !important;
-            background-color: #eff6ff !important;
+            border-color: #ef4444 !important; /* Red-500 */
+            background-color: #fef2f2 !important; /* Red-50 */
             border-style: dashed !important;
         }
 
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 10px;
         }
         ::-webkit-scrollbar-track {
-            background: #fce7f3;
+            background: #ffe4e6;
             border-radius: 5px;
         }
         ::-webkit-scrollbar-thumb {
-            background: #db2777; 
+            background: #f43f5e; 
             border-radius: 5px;
-            border: 2px solid #fce7f3;
+            border: 2px solid #ffe4e6;
         }
     </style>
 </head>
@@ -143,7 +143,6 @@
         const Icon = ({ children, className, size = 24, ...props }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
         );
-        const Clover = (props) => (<Icon {...props}><path d="M16.2 7.8 16.7 5.3a2 2 0 0 0-3.5-1.5L12 6.1 10.8 3.8a2 2 0 0 0-3.5 1.5l.5 2.5-2.5-.5a2 2 0 0 0-1.5 3.5l2.3 1.2-2.3 1.2a2 2 0 0 0 1.5 3.5l2.5-.5-.5 2.5a2 2 0 0 0 3.5 1.5l1.2-2.3 1.2 2.3a2 2 0 0 0 3.5-1.5l-.5-2.5 2.5.5a2 2 0 0 0 1.5-3.5l-2.3-1.2 2.3-1.2a2 2 0 0 0-1.5-3.5z" /><path d="M12 18v4" /></Icon>);
         const Plus = (props) => (<Icon {...props}><path d="M5 12h14" /><path d="M12 5v14" /></Icon>);
         const X = (props) => (<Icon {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Icon>);
         const Settings = (props) => (<Icon {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Icon>);
@@ -160,6 +159,7 @@
         const AlertTriangle = (props) => (<Icon {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></Icon>);
         const Undo2 = (props) => (<Icon {...props}><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></Icon>);
         const Redo2 = (props) => (<Icon {...props}><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/></Icon>);
+        const FileSpreadsheet = (props) => (<Icon {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></Icon>);
 
         // 預設資料
         const DEFAULT_SCENES = [
@@ -198,24 +198,21 @@
         ];
 
         const App = () => {
-            // History State implementation
             const [history, setHistory] = useState({
                 past: [],
                 present: DEFAULT_SCENES,
                 future: []
             });
             
-            // Derived scenes for rendering
             const scenes = history.present;
 
-            // Custom setter that records history
             const setScenes = (newScenesOrFn) => {
                 setHistory(curr => {
                     const newPresent = typeof newScenesOrFn === 'function' 
                         ? newScenesOrFn(curr.present) 
                         : newScenesOrFn;
                     
-                    if (newPresent === curr.present) return curr; // No change
+                    if (newPresent === curr.present) return curr;
 
                     return {
                         past: [...curr.past, curr.present],
@@ -265,6 +262,8 @@
             const [isRedrawSpinning, setIsRedrawSpinning] = useState(false);
             const [redrawDisplay, setRedrawDisplay] = useState(null);
             const [redrawSelectedGroups, setRedrawSelectedGroups] = useState(new Set());
+            // 新增：暫存重抽目標，用於「再重抽一次」
+            const [currentRedrawTarget, setCurrentRedrawTarget] = useState(null);
             
             const [newNameList, setNewNameList] = useState('');
             const [newGroupName, setNewGroupName] = useState('一般'); 
@@ -438,6 +437,44 @@
                 event.target.value = null;
             };
 
+            const handleExportWinnersXlsx = () => {
+                if (currentScene.history.length === 0) {
+                    alert("⚠️ 目前還沒有中獎紀錄可以匯出喔！");
+                    return;
+                }
+                try {
+                    const wb = XLSX.utils.book_new();
+                    const allWinnersData = [["獎項名稱", "得獎者", "部門", "中獎時間"]];
+                    currentScene.history.forEach(h => {
+                        allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time]);
+                    });
+                    const wsAll = XLSX.utils.aoa_to_sheet(allWinnersData);
+                    XLSX.utils.book_append_sheet(wb, wsAll, "總覽");
+                    
+                    const prizesInHistory = [...new Set(currentScene.history.map(h => h.prizeName))];
+                    prizesInHistory.forEach(prizeName => {
+                        const winners = currentScene.history.filter(h => h.prizeName === prizeName);
+                        const sheetData = [["得獎者", "部門", "中獎時間"]];
+                        winners.forEach(w => {
+                            sheetData.push([w.personName, w.personGroup || '', w.time]);
+                        });
+                        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+                        const safeName = prizeName.replace(/[\\/?*\[\]]/g, '').substring(0, 30);
+                        let sheetName = safeName;
+                        let counter = 1;
+                        while (wb.SheetNames.includes(sheetName)) {
+                            sheetName = `${safeName.substring(0, 28)}_${counter}`;
+                            counter++;
+                        }
+                        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                    });
+                    XLSX.writeFile(wb, `${currentScene.title}_中獎名單.xlsx`);
+                } catch (error) {
+                    console.error("Export Error:", error);
+                    alert("匯出失敗，請確認瀏覽器支援或聯絡管理員。");
+                }
+            };
+
             const triggerConfetti = () => {
                 var duration = 3 * 1000;
                 var animationEnd = Date.now() + duration;
@@ -485,7 +522,6 @@
                 let counter = 0;
                 const speed = 40; 
                 
-                // 恢復為原本的快速閃爍動畫 (Reverted to Flashing Names)
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
                     setDisplayParticipant(candidates[randomIdx]);
@@ -494,14 +530,12 @@
 
                 setTimeout(() => {
                     clearInterval(timerRef.current);
-                    
                     const winner = getWeightedWinner(candidates, currentPrize.id);
                     if (!winner) {
                         setIsSpinning(false);
                         alert("⚠️ 所有候選人的中獎機率皆為 0，無法抽出得主！");
                         return;
                     }
-
                     setIsSpinning(false);
                     setLastWinner({ person: winner, prize: currentPrize });
                     setDisplayParticipant(winner);
@@ -602,6 +636,13 @@
                     triggerConfetti();
                 }, 2500);
             };
+            
+            // 重新開啟部門選擇選單 (用於「再重抽一次」按鈕)
+            const reopenRedrawMenu = () => {
+                setShowRedrawModal(false); // 關閉結果
+                setShowRedrawMenu(true);   // 開啟選單
+                // 保留之前的選取狀態 redrawSelectedGroups 不清空，方便使用者直接按開始
+            };
 
             const toggleParticipantActive = (pId) => {
                 setScenes(prev => prev.map(scene => {
@@ -691,25 +732,25 @@
 
                     {/* Header */}
                     <div className="flex-none flex flex-wrap gap-3 mb-4 items-center">
-                        <div className="text-3xl font-black text-pink-600 mr-4 flex items-center gap-2 drop-shadow-sm select-none">
+                        <div className="text-3xl font-black text-red-600 mr-4 flex items-center gap-2 drop-shadow-sm select-none">
                             LUCKY DRAW
                         </div>
                         {scenes.map(scene => (
-                            <div key={scene.id} onClick={() => setActiveSceneId(scene.id)} className={`relative px-6 py-3 rounded-xl cursor-pointer transition-all flex items-center gap-2 font-bold shadow-md select-none ${activeSceneId === scene.id ? 'bg-gradient-to-br from-pink-500 to-rose-600 text-white scale-105 shadow-pink-300 ring-4 ring-pink-200' : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-pink-500'}`}>
+                            <div key={scene.id} onClick={() => setActiveSceneId(scene.id)} className={`relative px-6 py-3 rounded-xl cursor-pointer transition-all flex items-center gap-2 font-bold shadow-md select-none ${activeSceneId === scene.id ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white scale-105 shadow-red-300 ring-4 ring-red-200' : 'bg-white text-gray-500 hover:bg-red-50 hover:text-red-500'}`}>
                                 {activeSceneId === scene.id ? ( <input value={scene.title} onChange={(e) => updateSceneTitle(e.target.value)} className="bg-transparent border-b-2 border-white/50 focus:border-white focus:outline-none w-24 sm:w-auto text-white placeholder-white/70" /> ) : ( <span>{scene.title}</span> )}
                                 {activeSceneId === scene.id && scenes.length > 1 && ( <button onClick={(e) => deleteScene(e, scene.id)} className="text-white/70 hover:text-white ml-2 bg-black/10 rounded-full p-0.5"> <X size={14} /> </button> )}
                             </div>
                         ))}
-                        <button onClick={addNewScene} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-gray-400 hover:text-pink-500 hover:bg-pink-50 shadow-sm transition-all border-2 border-dashed border-gray-300 hover:border-pink-300"> <Plus size={24} /> </button>
+                        <button onClick={addNewScene} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition-all border-2 border-dashed border-gray-300 hover:border-red-300"> <Plus size={24} /> </button>
                         <div className="ml-auto flex gap-2">
                             {/* Undo/Redo Buttons */}
-                            <button onClick={undo} disabled={history.past.length === 0} className={`p-2 rounded-lg transition ${history.past.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-pink-500 hover:bg-white hover:shadow-sm'}`} title="復原"><Undo2 size={20}/></button>
-                            <button onClick={redo} disabled={history.future.length === 0} className={`p-2 rounded-lg transition ${history.future.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-pink-500 hover:bg-white hover:shadow-sm'}`} title="重做"><Redo2 size={20}/></button>
+                            <button onClick={undo} disabled={history.past.length === 0} className={`p-2 rounded-lg transition ${history.past.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-red-500 hover:bg-white hover:shadow-sm'}`} title="復原"><Undo2 size={20}/></button>
+                            <button onClick={redo} disabled={history.future.length === 0} className={`p-2 rounded-lg transition ${history.future.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-red-500 hover:bg-white hover:shadow-sm'}`} title="重做"><Redo2 size={20}/></button>
 
-                            <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 hover:text-pink-500 transition-all font-bold border border-gray-200" title="匯入設定"><Upload size={18} /><span className="hidden sm:inline">匯入</span></button>
-                            <button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 hover:text-pink-500 transition-all font-bold border border-gray-200" title="匯出設定"><Download size={18} /><span className="hidden sm:inline">匯出</span></button>
+                            <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯入設定"><Upload size={18} /><span className="hidden sm:inline">匯入</span></button>
+                            <button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯出設定"><Download size={18} /><span className="hidden sm:inline">匯出</span></button>
                             <button onClick={() => { setShowAdminLogin(true); setLoginError(false); }} className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-black hover:scale-105 transition-all font-bold border border-gray-900" title="管理員登入"><Shield size={18} /></button>
-                            <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-gray-800 hover:scale-105 transition-all font-bold ring-2 ring-gray-200"><Settings size={20} /><span>設定</span></button>
+                            <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-red-700 hover:scale-105 transition-all font-bold ring-2 ring-red-200"><Settings size={20} /><span>設定</span></button>
                         </div>
                     </div>
 
@@ -718,46 +759,41 @@
                         {/* Left: The Wheel */}
                         <div className="lg:col-span-7 flex flex-col items-center justify-center h-full min-h-0 overflow-y-auto lg:overflow-visible">
                             <div className="flex-none mb-4 text-center w-full max-w-lg">
-                                <div className="text-pink-500 font-black mb-2 tracking-widest text-sm uppercase bg-pink-100 inline-block px-3 py-1 rounded-full">Current Prize</div>
-                                <h2 className="text-5xl md:text-6xl font-black text-gray-800 flex items-center justify-center gap-4 drop-shadow-sm my-2">
-                                    <Gift className="text-rose-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
-                                    <span className="truncate">{currentPrize ? currentPrize.name : "—"}</span>
+                                <div className="text-red-500 font-black mb-2 tracking-widest text-sm uppercase bg-red-100 inline-block px-3 py-1 rounded-full border border-red-200">Current Prize</div>
+                                <h2 className="text-5xl md:text-6xl font-black text-gray-800 flex items-center justify-center gap-4 drop-shadow-sm my-2 leading-relaxed py-4">
+                                    <Gift className="text-red-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
+                                    <span className="">{currentPrize ? currentPrize.name : "—"}</span>
                                 </h2>
                                 <div className="flex justify-center mt-2"><span className="bg-gray-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">剩餘數量: {currentPrize ? currentPrize.count : 0}</span></div>
                             </div>
 
-                            {/* Wheel Container - Responsive Height */}
-                            <div className="flex-1 w-full max-h-[60vh] flex items-center justify-center min-h-0">
-                                <div className={`aspect-[16/10] h-full w-auto max-w-full bg-gradient-to-br from-white to-gray-50 rounded-[32px] flex items-center justify-center relative overflow-hidden transition-all ${isSpinning ? 'rainbow-border' : 'border-[6px] border-yellow-400 shadow-[0_15px_40px_-10px_rgba(251,191,36,0.5)]'}`}>
-                                    <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
-                                    <div className="z-10 text-center w-full px-4">
-                                        {isSpinning ? (
-                                            <div className="animate-pop">
-                                                <div className="text-6xl md:text-8xl font-black gold-text-impact tracking-tight leading-normal py-2">{displayParticipant?.name}</div>
-                                                <div className="text-xl md:text-2xl font-bold gold-text-impact mt-2 tracking-widest pb-2">{displayParticipant?.group || ''}</div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center animate-bounce-slow opacity-60">
-                                                <span className="text-8xl mb-4 opacity-50">🎰</span>
-                                                <span className="text-4xl md:text-5xl font-black gold-text-impact tracking-wider leading-relaxed py-2">READY TO DRAW</span>
-                                            </div>
-                                        )}
-                                    </div>
+                            {/* The Big Animated Card */}
+                            <div className={`w-full max-w-2xl aspect-[16/9] bg-gradient-to-br from-white to-gray-50 rounded-[32px] flex items-center justify-center relative overflow-hidden transition-all ${isSpinning ? 'rainbow-border' : 'border-[6px] border-yellow-400 shadow-[0_15px_40px_-10px_rgba(239,68,68,0.5)]'}`}>
+                                <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
+                                <div className="z-10 text-center w-full px-4">
+                                    {isSpinning ? (
+                                        <div className="animate-pop">
+                                            <div className="text-6xl md:text-8xl font-black gold-text-impact tracking-tight leading-normal py-2">{displayParticipant?.name}</div>
+                                            <div className="text-xl md:text-2xl font-bold gold-text-impact mt-2 tracking-widest pb-2">{displayParticipant?.group || ''}</div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center animate-bounce-slow opacity-60">
+                                            <span className="text-8xl mb-4 opacity-50">🎰</span>
+                                            <span className="text-4xl md:text-5xl font-black gold-text-impact tracking-wider leading-relaxed py-2">READY TO DRAW</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            
-                            <div className="flex-none mt-6 w-full flex justify-center">
-                                <button onClick={startDraw} disabled={isSpinning || !currentPrize || currentPrize.count === 0} className={`w-full max-w-sm py-5 rounded-2xl text-3xl font-black shadow-[0_10px_0_0_rgba(0,0,0,0.2)] transform transition-all active:shadow-none active:translate-y-[10px] ${(isSpinning || !currentPrize || currentPrize.count === 0) ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-y-[10px]' : 'bg-gradient-to-r from-rose-500 to-pink-600 text-white hover:brightness-110 shadow-[0_10px_0_0_#9d174d]'}`}>{isSpinning ? 'SPINNING...' : (currentPrize && currentPrize.count === 0 ? '獎項已抽完' : '開始抽獎 !')}</button>
-                            </div>
+                            <button onClick={startDraw} disabled={isSpinning || !currentPrize || currentPrize.count === 0} className={`mt-10 w-full max-w-sm py-5 rounded-2xl text-3xl font-black shadow-[0_10px_0_0_rgba(0,0,0,0.2)] transform transition-all active:shadow-none active:translate-y-[10px] ${(isSpinning || !currentPrize || currentPrize.count === 0) ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-y-[10px]' : 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:brightness-110 shadow-[0_10px_0_0_#9f1239]'}`}>{isSpinning ? 'SPINNING...' : (currentPrize && currentPrize.count === 0 ? '獎項已抽完' : '開始抽獎 !')}</button>
                         </div>
 
                         {/* Right: Info Panel */}
                         <div className="lg:col-span-5 flex flex-col gap-4 h-full min-h-0">
                             {/* Prize List */}
-                            <div className="flex-1 min-h-0 bg-white rounded-3xl p-1 shadow-inner border-2 border-pink-100 flex flex-col">
-                                <div className="bg-pink-50 p-4 rounded-t-[20px] flex-none flex items-center justify-between border-b-2 border-pink-100">
-                                    <h3 className="font-black text-xl text-pink-600 flex items-center gap-2"><Trophy size={24} className="text-yellow-500" /> 獎項清單 PRIZES</h3>
-                                    <span className="text-xs font-bold bg-pink-200 text-pink-700 px-2 py-1 rounded">{currentScene.prizes.reduce((acc, p) => acc + p.count, 0)} items left</span>
+                            <div className="flex-1 min-h-0 bg-white rounded-3xl p-1 shadow-inner border-2 border-red-100 flex flex-col">
+                                <div className="bg-red-50 p-4 rounded-t-[20px] flex-none flex items-center justify-between border-b-2 border-red-100">
+                                    <h3 className="font-black text-xl text-red-600 flex items-center gap-2"><Trophy size={24} className="text-yellow-500" /> 獎項清單 PRIZES</h3>
+                                    <span className="text-xs font-bold bg-red-200 text-red-700 px-2 py-1 rounded">{currentScene.prizes.reduce((acc, p) => acc + p.count, 0)} items left</span>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                                     {currentScene.prizes.map((prize, idx) => {
@@ -766,9 +802,9 @@
                                             <div key={prize.id} onClick={() => setSelectedPrizeId(prize.id)} className={`relative p-4 rounded-xl flex justify-between items-center transition-all cursor-pointer ${prize.count === 0 ? 'bg-gray-100 border-2 border-gray-200 opacity-60 grayscale' : (isActivePrize ? 'selected-prize-card' : 'bg-white list-card-shadow')}`}>
                                                 <div className="flex flex-col">
                                                     <span className={`font-black text-lg ${prize.count === 0 ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{prize.name}</span>
-                                                    {isActivePrize && prize.count > 0 && <span className="text-[10px] font-bold text-pink-500 uppercase tracking-wider mt-1">Current Target</span>}
+                                                    {isActivePrize && prize.count > 0 && <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider mt-1">Current Target</span>}
                                                 </div>
-                                                <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-rose-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
+                                                <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
                                             </div>
                                         );
                                     })}
@@ -776,17 +812,18 @@
                                 </div>
                             </div>
                             {/* Winner History */}
-                            <div className="flex-1 min-h-0 bg-gray-50 rounded-3xl p-1 border-2 border-gray-200 flex flex-col">
-                                <div className="bg-gray-100 p-4 rounded-t-[20px] flex-none border-b-2 border-gray-200">
+                            <div className="flex-1 min-h-0 bg-red-50 rounded-3xl p-1 border-2 border-red-200 flex flex-col">
+                                <div className="bg-red-100 p-4 rounded-t-[20px] flex-none border-b-2 border-red-200 flex justify-between items-center">
                                     <h3 className="font-black text-xl text-gray-600 flex items-center gap-2"><Users size={24} className="text-gray-500"/> {currentPrize ? `${currentPrize.name} 得主` : '中獎紀錄'}</h3>
+                                    <button onClick={handleExportWinnersXlsx} className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-100 hover:bg-green-200 px-3 py-1.5 rounded-lg transition" title="匯出中獎名單為 Excel (.xlsx)"><FileSpreadsheet size={16}/> 匯出得獎名單</button>
                                 </div>
                                 <ul className="flex-1 overflow-y-auto p-4 space-y-2">
                                     {currentScene.history.filter(record => !currentPrize || record.prizeId === currentPrize.id).map((record, idx) => (
                                         <li key={idx} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-gray-100 animate-pop">
                                             <span className="font-mono text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{record.time}</span>
                                             <div className="flex flex-col flex-1">
-                                                <span className="font-black text-lg text-gray-800">{record.personName}</span>
-                                                {record.personGroup && <span className="text-xs text-gray-400 font-bold">{record.personGroup}</span>}
+                                                <span className="font-black text-lg text-gray-800 gold-text-impact">{record.personName}</span>
+                                                {record.personGroup && <span className="text-xs text-gray-400 font-bold gold-text-impact">{record.personGroup}</span>}
                                             </div>
                                             <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">{record.prizeName}</span>
                                         </li>
@@ -799,7 +836,7 @@
                         </div>
                     </main>
 
-                    {/* Modals... (Same as before) */}
+                    {/* Modals */}
                     
                     {/* Admin Login */}
                     {showAdminLogin && (
@@ -983,6 +1020,7 @@
                     {/* Small Redraw Modal */}
                     {showRedrawModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
+                            {/* Reusing Winner Modal Styles */}
                             <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(236,72,153,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
                                 <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
                                     <RefreshCw size={36} className="text-white md:hidden animate-spin-slow" />
@@ -1000,8 +1038,20 @@
                                     ) : (
                                         <div className="w-full flex flex-col items-center animate-pop flex-1 justify-center">
                                             <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-2 text-center w-full">{redrawDisplay?.name}</div>
-                                            <div className="text-lg md:text-2xl font-bold gold-text-impact mb-8 tracking-widest opacity-90 text-center w-full">{redrawDisplay?.group}</div>
-                                            <button onClick={confirmWin} className="w-full max-w-md bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2 mt-auto"><CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下</button>
+                                            <div className="text-lg md:text-2xl font-bold gold-text-impact mb-6 tracking-widest opacity-90 text-center w-full">{redrawDisplay?.group}</div>
+                                            
+                                            <div className="bg-pink-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-6 border-[3px] md:border-[5px] border-pink-100 shadow-inner w-full text-center max-w-3xl">
+                                                <div className="text-xs md:text-base text-pink-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
+                                                <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">
+                                                    {lastWinner?.prize?.name}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full max-w-2xl mt-auto">
+                                                <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下</button>
+                                                {/* Reopen Redraw Menu Loop */}
+                                                <button onClick={reopenRedrawMenu} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-8 md:h-8"/> 再試一次</button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1012,6 +1062,7 @@
                     {/* Main Winner Modal */}
                     {showWinnerModal && lastWinner && !showRedrawModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
+                            {/* Responsive Modal Container */}
                             <div className="bg-white rounded-[32px] md:rounded-[60px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(250,204,21,0.8)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
                                 <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
                                     <Trophy size={36} className="text-white md:hidden" strokeWidth={2.5} />
@@ -1019,12 +1070,23 @@
                                 </div>
                                 <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
                                     <h2 className="text-lg md:text-3xl font-black text-gray-300 mb-1 md:mb-3 uppercase tracking-[0.2em] text-center w-full mt-4 md:mt-0">Winner!</h2>
-                                    <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-1 text-center w-full">{lastWinner?.person?.name}</div>
-                                    <div className="text-lg md:text-2xl font-bold gold-text-impact mb-3 md:mb-6 tracking-widest opacity-90 text-center w-full">{lastWinner?.person?.group || '一般'}</div>
-                                    <div className="bg-pink-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-3 md:mb-6 border-[3px] md:border-[5px] border-pink-100 shadow-inner w-full text-center">
-                                        <div className="text-xs md:text-base text-pink-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
-                                        <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">{lastWinner.prize.name}</div>
+                                    
+                                    {/* Responsive Text Size using vmin/vmax logic via Tailwind classes */}
+                                    <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-1 text-center w-full">
+                                        {lastWinner?.person?.name}
                                     </div>
+                                    
+                                    <div className="text-lg md:text-2xl font-bold gold-text-impact mb-3 md:mb-6 tracking-widest opacity-90 text-center w-full">
+                                        {lastWinner?.person?.group || '一般'}
+                                    </div>
+                                    
+                                    <div className="bg-pink-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-3 md:mb-6 border-[3px] md:border-[5px] border-pink-100 shadow-inner w-full text-center max-w-3xl">
+                                        <div className="text-xs md:text-base text-pink-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
+                                        <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">
+                                            {lastWinner.prize.name}
+                                        </div>
+                                    </div>
+
                                     <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full mt-auto">
                                         <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-7 md:h-7"/> 開心收下 🎉</button>
                                         <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 再抽一次 🔄</button>
