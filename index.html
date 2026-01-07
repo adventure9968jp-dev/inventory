@@ -145,6 +145,8 @@
         const Download = (props) => (<Icon {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></Icon>);
         const Shield = (props) => (<Icon {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></Icon>);
         const AlertTriangle = (props) => (<Icon {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></Icon>);
+        const Undo2 = (props) => (<Icon {...props}><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></Icon>);
+        const Redo2 = (props) => (<Icon {...props}><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/></Icon>);
 
         // 預設資料
         const DEFAULT_SCENES = [
@@ -183,7 +185,59 @@
         ];
 
         const App = () => {
-            const [scenes, setScenes] = useState(DEFAULT_SCENES);
+            // History State implementation
+            const [history, setHistory] = useState({
+                past: [],
+                present: DEFAULT_SCENES,
+                future: []
+            });
+            
+            // Derived scenes for rendering
+            const scenes = history.present;
+
+            // Custom setter that records history
+            const setScenes = (newScenesOrFn) => {
+                setHistory(curr => {
+                    const newPresent = typeof newScenesOrFn === 'function' 
+                        ? newScenesOrFn(curr.present) 
+                        : newScenesOrFn;
+                    
+                    if (newPresent === curr.present) return curr; // No change
+
+                    return {
+                        past: [...curr.past, curr.present],
+                        present: newPresent,
+                        future: []
+                    };
+                });
+            };
+
+            const undo = () => {
+                setHistory(curr => {
+                    if (curr.past.length === 0) return curr;
+                    const previous = curr.past[curr.past.length - 1];
+                    const newPast = curr.past.slice(0, curr.past.length - 1);
+                    return {
+                        past: newPast,
+                        present: previous,
+                        future: [curr.present, ...curr.future]
+                    };
+                });
+            };
+
+            const redo = () => {
+                setHistory(curr => {
+                    if (curr.future.length === 0) return curr;
+                    const next = curr.future[0];
+                    const newFuture = curr.future.slice(1);
+                    return {
+                        past: [...curr.past, curr.present],
+                        present: next,
+                        future: newFuture
+                    };
+                });
+            };
+
             const [activeSceneId, setActiveSceneId] = useState('scene-1');
             const [isSpinning, setIsSpinning] = useState(false);
             const [displayParticipant, setDisplayParticipant] = useState(null);
@@ -287,7 +341,7 @@
                                 ...s,
                                 weights: s.weights || {}
                             }));
-                            setScenes(safeScenes);
+                            setScenes(safeScenes); // History handled by wrapper
                             if (!safeScenes.find(s => s.id === activeSceneId)) {
                                 setActiveSceneId(safeScenes[0]?.id || 'scene-1');
                             }
@@ -635,6 +689,10 @@
                         ))}
                         <button onClick={addNewScene} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-gray-400 hover:text-pink-500 hover:bg-pink-50 shadow-sm transition-all border-2 border-dashed border-gray-300 hover:border-pink-300"> <Plus size={24} /> </button>
                         <div className="ml-auto flex gap-2">
+                            {/* Undo/Redo Buttons */}
+                            <button onClick={undo} disabled={history.past.length === 0} className={`p-2 rounded-lg transition ${history.past.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-pink-500 hover:bg-white hover:shadow-sm'}`} title="復原"><Undo2 size={20}/></button>
+                            <button onClick={redo} disabled={history.future.length === 0} className={`p-2 rounded-lg transition ${history.future.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-pink-500 hover:bg-white hover:shadow-sm'}`} title="重做"><Redo2 size={20}/></button>
+
                             <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 hover:text-pink-500 transition-all font-bold border border-gray-200" title="匯入設定"><Upload size={18} /><span className="hidden sm:inline">匯入</span></button>
                             <button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 hover:text-pink-500 transition-all font-bold border border-gray-200" title="匯出設定"><Download size={18} /><span className="hidden sm:inline">匯出</span></button>
                             <button onClick={() => { setShowAdminLogin(true); setLoginError(false); }} className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-black hover:scale-105 transition-all font-bold border border-gray-900" title="管理員登入"><Shield size={18} /></button>
@@ -661,13 +719,19 @@
                                 <div className="z-10 text-center w-full px-4">
                                     {isSpinning ? (
                                         <div className="animate-pop">
-                                            <div className="text-6xl md:text-8xl font-black text-gray-900 tracking-tight">{displayParticipant?.name}</div>
-                                            <div className="text-xl md:text-2xl font-bold text-gray-500 mt-2 tracking-widest">{displayParticipant?.group || ''}</div>
+                                            {/* 修改：增加 py-2 與 leading-normal 避免文字下方被切到 */}
+                                            <div className="text-6xl md:text-8xl font-black gold-text-impact tracking-tight leading-normal py-2">
+                                                {displayParticipant?.name}
+                                            </div>
+                                            {/* 修改：增加 pb-2 確保下方空間 */}
+                                            <div className="text-xl md:text-2xl font-bold gold-text-impact mt-2 tracking-widest pb-2">
+                                                {displayParticipant?.group || ''}
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center animate-bounce-slow opacity-60">
-                                            <span className="text-8xl mb-4">🎰</span>
-                                            <span className="text-3xl font-black text-gray-400 tracking-wider">READY TO DRAW</span>
+                                            <span className="text-8xl mb-4 opacity-50">🎰</span>
+                                            <span className="text-4xl md:text-5xl font-black gold-text-impact tracking-wider leading-relaxed py-2">READY TO DRAW</span>
                                         </div>
                                     )}
                                 </div>
@@ -906,45 +970,112 @@
 
                     {/* Small Redraw Modal */}
                     {showRedrawModal && (
-                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            <div className="bg-white rounded-[40px] p-12 max-w-lg w-full text-center relative shadow-[0_0_80px_rgba(236,72,153,0.6)] animate-pop rainbow-border" onClick={e => e.stopPropagation()}>
-                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-5 border-[4px] border-white shadow-xl">
-                                    <RefreshCw size={40} className="text-white animate-spin-slow" />
+                        <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
+                            {/* 修改：比照中獎視窗的巨大化與自適應設定 */}
+                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(236,72,153,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
+                                
+                                {/* 頂部圖示：放大並調整位置 */}
+                                <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
+                                    <RefreshCw size={36} className="text-white md:hidden animate-spin-slow" />
+                                    <RefreshCw size={72} className="text-white hidden md:block animate-spin-slow" />
                                 </div>
-                                <div className="mt-10 mb-4 text-pink-500 font-bold uppercase tracking-wider text-base">重抽進行中...</div>
-                                {isRedrawSpinning ? (
-                                    <div className="py-10">
-                                        <div className="text-6xl font-black text-gray-900 animate-pulse truncate">{redrawDisplay?.name}</div>
-                                        <div className="text-xl text-gray-400 font-bold mt-2">{redrawDisplay?.group}</div>
+                                
+                                {/* 內容捲動區 */}
+                                <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
+                                    
+                                    <div className="text-pink-400 font-black uppercase tracking-widest text-sm md:text-xl mb-2 md:mb-4 mt-4 md:mt-0">
+                                        {isRedrawSpinning ? "REROLLING..." : "NEW WINNER!"}
                                     </div>
-                                ) : (
-                                    <div className="py-8 animate-pop">
-                                        <div className="text-7xl font-black gold-text-impact mb-4">{redrawDisplay?.name}</div>
-                                        <div className="text-2xl font-bold text-gray-400 mb-8">{redrawDisplay?.group}</div>
-                                        <button onClick={confirmWin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-2xl font-black text-xl hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><CheckCircle size={24}/> 確認收下</button>
-                                    </div>
-                                )}
+                                    
+                                    {isRedrawSpinning ? (
+                                        <div className="w-full flex flex-col items-center justify-center flex-1 min-h-[200px]">
+                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black text-gray-300 animate-pulse truncate py-2">
+                                                {redrawDisplay?.name}
+                                            </div>
+                                            <div className="text-lg md:text-2xl font-bold text-gray-300 mt-2 tracking-widest">
+                                                {redrawDisplay?.group}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="w-full flex flex-col items-center animate-pop flex-1 justify-center">
+                                            {/* 名字：微調最大字體 (9xl -> 8xl) */}
+                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-2 text-center w-full">
+                                                {redrawDisplay?.name}
+                                            </div>
+                                            {/* 部門 */}
+                                            <div className="text-lg md:text-2xl font-bold gold-text-impact mb-8 tracking-widest opacity-90 text-center w-full">
+                                                {redrawDisplay?.group}
+                                            </div>
+                                            
+                                            {/* 確認按鈕：放大 */}
+                                            <button 
+                                                onClick={confirmWin}
+                                                className="w-full max-w-md bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2 mt-auto"
+                                            >
+                                                <CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* Main Winner Modal */}
                     {showWinnerModal && lastWinner && !showRedrawModal && (
-                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            <div className="bg-white rounded-[40px] p-10 max-w-lg w-full text-center relative shadow-[0_0_100px_rgba(250,204,21,0.5)] animate-pop rainbow-border" onClick={e => e.stopPropagation()}>
-                                <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full p-6 border-[6px] border-white shadow-xl">
-                                    <Trophy size={64} className="text-white" strokeWidth={3} />
+                        <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
+                            {/* 修改：
+                                1. 加入 style={{transform: 'scale(0.97)'}} 進行 3% 縮放
+                                2. max-h-[90vh] 讓視窗稍微再矮一點點，避免貼邊
+                                3. 稍微縮小圓角與內距
+                            */}
+                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(250,204,21,0.8)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
+                                
+                                {/* 獎盃：微調位置與大小 */}
+                                <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
+                                    <Trophy size={36} className="text-white md:hidden" strokeWidth={2.5} />
+                                    <Trophy size={72} className="text-white hidden md:block" strokeWidth={2.5} />
                                 </div>
-                                <h2 className="text-3xl font-black text-gray-400 mt-12 mb-4 uppercase tracking-widest">Winner!</h2>
-                                <div className="text-7xl font-black gold-text-impact mb-2 break-words leading-tight">{lastWinner?.person?.name}</div>
-                                <div className="text-xl font-bold text-gray-400 mb-8 tracking-widest">{lastWinner?.person?.group || '一般'}</div>
-                                <div className="bg-pink-50 rounded-2xl p-6 mb-8 border-2 border-pink-100">
-                                    <div className="text-xs text-pink-500 font-black uppercase tracking-widest mb-2">Prize Won</div>
-                                    <div className="text-3xl font-black text-gray-800">{lastWinner.prize.name}</div>
-                                </div>
-                                <div className="flex gap-4">
-                                    <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-2xl font-black text-xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"><CheckCircle size={24}/> 開心收下 🎉</button>
-                                    <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-4 rounded-2xl font-black text-xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw size={24}/> 再抽一次 🔄</button>
+                                
+                                {/* 內容捲動區：微調內距與字體大小 */}
+                                <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
+                                    
+                                    {/* 標題 */}
+                                    <h2 className="text-lg md:text-3xl font-black text-gray-300 mb-1 md:mb-3 uppercase tracking-[0.2em] text-center w-full mt-4 md:mt-0">Winner!</h2>
+                                    
+                                    {/* 名字：微調最大字體 (9xl -> 8xl) */}
+                                    <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-1 text-center w-full">
+                                        {lastWinner?.person?.name}
+                                    </div>
+                                    
+                                    {/* 部門 */}
+                                    <div className="text-lg md:text-2xl font-bold gold-text-impact mb-3 md:mb-6 tracking-widest opacity-90 text-center w-full">
+                                        {lastWinner?.person?.group || '一般'}
+                                    </div>
+                                    
+                                    {/* 獎品框：微調內距與字體 */}
+                                    <div className="bg-pink-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-3 md:mb-6 border-[3px] md:border-[5px] border-pink-100 shadow-inner w-full text-center">
+                                        <div className="text-xs md:text-base text-pink-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
+                                        <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">
+                                            {lastWinner.prize.name}
+                                        </div>
+                                    </div>
+
+                                    {/* 按鈕組：微調大小 */}
+                                    <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full mt-auto">
+                                        <button 
+                                            onClick={confirmWin}
+                                            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"
+                                        >
+                                            <CheckCircle className="w-5 h-5 md:w-7 md:h-7"/> 開心收下 🎉
+                                        </button>
+                                        <button 
+                                            onClick={handleRedrawClick}
+                                            className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"
+                                        >
+                                            <RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 再抽一次 🔄
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
