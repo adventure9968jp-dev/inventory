@@ -2,419 +2,956 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>廠區盤點系統 (完整存檔版)</title>
-    
-    <!-- PWA 設定 -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#2563eb">
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✨ 幸運轉盤 - 衝擊版</title>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
     <style>
-        body { 
-            font-family: "Microsoft JhengHei", sans-serif; 
-            overscroll-behavior-y: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background: radial-gradient(circle at center, #fce7f3 0%, #fbcfe8 100%);
+            min-height: 100vh;
+            padding-bottom: 2rem;
         }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        input, select, textarea { font-size: 16px !important; }
+
+        .impact-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border: 4px solid #F472B6;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5), 0 20px 40px -5px rgba(236, 72, 153, 0.4);
+            border-radius: 24px;
+        }
+
+        .list-card-shadow {
+            box-shadow: 4px 4px 0px 0px #FBBF24;
+            border: 2px solid #F59E0B;
+            transition: all 0.1s;
+        }
+        
+        .list-card-shadow:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px 0px #FBBF24;
+        }
+
+        .selected-prize-card {
+            border: 3px solid #ec4899 !important;
+            box-shadow: 0 0 0 2px #fbcfe8, 4px 4px 0px 0px #ec4899 !important;
+            background-color: #fff1f2 !important;
+            transform: scale(1.02);
+        }
+
+        .gold-text-impact {
+            background: linear-gradient(180deg, #F59E0B 0%, #D97706 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 2px 2px 0px rgba(251, 191, 36, 0.2);
+            font-weight: 900;
+        }
+
+        .animate-pop {
+            animation: highlight 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .animate-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes highlight {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        @keyframes rainbow-flash {
+            0% { border-color: #ff0000; box-shadow: 0 0 30px #ff0000; }
+            15% { border-color: #ff7f00; box-shadow: 0 0 30px #ff7f00; }
+            30% { border-color: #ffff00; box-shadow: 0 0 30px #ffff00; }
+            45% { border-color: #00ff00; box-shadow: 0 0 30px #00ff00; }
+            60% { border-color: #0000ff; box-shadow: 0 0 30px #0000ff; }
+            75% { border-color: #4b0082; box-shadow: 0 0 30px #4b0082; }
+            90% { border-color: #9400d3; box-shadow: 0 0 30px #9400d3; }
+            100% { border-color: #ff0000; box-shadow: 0 0 30px #ff0000; }
+        }
+
+        .rainbow-border {
+            animation: rainbow-flash 1.5s linear infinite;
+            border-width: 8px;
+            border-style: solid;
+        }
+
+        .dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+        
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+            border-style: dashed !important;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #fce7f3;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #db2777; 
+            border-radius: 5px;
+            border: 2px solid #fce7f3;
+        }
     </style>
 </head>
-<body class="bg-gray-50 text-slate-800 h-[100dvh] w-screen overflow-hidden">
-    <div id="root" class="h-full w-full"></div>
+<body>
+    <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useRef, useEffect } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
-        // --- 輔助函式：將檔案轉為 Base64 字串 (讓圖片可以被存入 JSON) ---
-        const fileToBase64 = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = (error) => reject(error);
-            });
-        };
-
-        // --- 圖示元件 ---
-        const IconBase = ({ d, size = 24, className = "", ...props }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-                {Array.isArray(d) ? d.map((path, i) => <path key={i} d={path} />) : <path d={d} />}
-            </svg>
+        // --- Icon Components ---
+        const Icon = ({ children, className, size = 24, ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
         );
+        const Clover = (props) => (<Icon {...props}><path d="M16.2 7.8 16.7 5.3a2 2 0 0 0-3.5-1.5L12 6.1 10.8 3.8a2 2 0 0 0-3.5 1.5l.5 2.5-2.5-.5a2 2 0 0 0-1.5 3.5l2.3 1.2-2.3 1.2a2 2 0 0 0 1.5 3.5l2.5-.5-.5 2.5a2 2 0 0 0 3.5 1.5l1.2-2.3 1.2 2.3a2 2 0 0 0 3.5-1.5l-.5-2.5 2.5.5a2 2 0 0 0 1.5-3.5l-2.3-1.2 2.3-1.2a2 2 0 0 0-1.5-3.5z" /><path d="M12 18v4" /></Icon>);
+        const Plus = (props) => (<Icon {...props}><path d="M5 12h14" /><path d="M12 5v14" /></Icon>);
+        const X = (props) => (<Icon {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Icon>);
+        const Settings = (props) => (<Icon {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Icon>);
+        const Gift = (props) => (<Icon {...props}><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></Icon>);
+        const Trophy = (props) => (<Icon {...props}><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></Icon>);
+        const Users = (props) => (<Icon {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></Icon>);
+        const RefreshCw = (props) => (<Icon {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></Icon>);
+        const CheckCircle = (props) => (<Icon {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" /></Icon>);
+        const Trash2 = (props) => (<Icon {...props}><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></Icon>);
+        const Building = (props) => (<Icon {...props}><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" /><path d="M8 14h.01" /><path d="M16 14h.01" /></Icon>);
+        const Upload = (props) => (<Icon {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></Icon>);
+        const Download = (props) => (<Icon {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></Icon>);
+        const Shield = (props) => (<Icon {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></Icon>);
+        const AlertTriangle = (props) => (<Icon {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></Icon>);
 
-        const Icons = {
-            MapPin: (props) => <IconBase d={["M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z", "M12 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"]} {...props} />,
-            X: (props) => <IconBase d={["M18 6 6 18", "M6 6 18 18"]} {...props} />,
-            Package: (props) => <IconBase d={["m16.5 9.4-9-5.19", "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z", "M3.27 6.96 12 12.01l8.73-5.05", "M12 22.08V12"]} {...props} />,
-            Search: (props) => <IconBase d={["M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z", "m21 21-4.3-4.3"]} {...props} />,
-            Info: (props) => <IconBase d={["M12 16v-4", "M12 8h.01", "M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z"]} {...props} />,
-            AlertCircle: (props) => <IconBase d={["M12 8v4", "M12 16h.01", "M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z"]} {...props} />,
-            CheckCircle: (props) => <IconBase d={["M22 11.08V12a10 10 0 1 1-5.93-9.14", "M22 4 12 14.01l-3-3"]} {...props} />,
-            Smartphone: (props) => <IconBase d={["M12 18h.01", "M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"]} {...props} />,
-            Upload: (props) => <IconBase d={["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M17 8l-5-5-5 5", "M12 3v12"]} {...props} />,
-            Edit3: (props) => <IconBase d={["M12 20h9", "M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"]} {...props} />,
-            Save: (props) => <IconBase d={["M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z", "M17 21v-8H7v8", "M7 3v5h8"]} {...props} />,
-            Plus: (props) => <IconBase d={["M5 12h14", "M12 5v14"]} {...props} />,
-            ImageIcon: (props) => <IconBase d={["M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z", "m15 11-5.5 5.5-2.5-2.5L3 18", "M19 18l-4.5-4.5-1.5 1.5", "M9 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"]} {...props} />,
-            Trash2: (props) => <IconBase d={["M3 6h18", "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6", "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2", "M10 11v6", "M14 11v6"]} {...props} />,
-            Pencil: (props) => <IconBase d={["M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z", "M15 5l4 4"]} {...props} />,
-            Download: (props) => <IconBase d={["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M7 10l5 5 5-5", "M12 15V3"]} {...props} />,
-            FileJson: (props) => <IconBase d={["M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z", "M14 2v6h6", "M10 12a1 1 0 0 0-1 1v1a1 1 0 0 1-1 1 1 1 0 0 1 1 1v1a1 1 0 0 0 1 1"]} {...props} />,
-            Menu: (props) => <IconBase d={["M3 12h18", "M3 6h18", "M3 18h18"]} {...props} />,
-        };
-        const { MapPin, X, Package, Search, Info, AlertCircle, CheckCircle, Smartphone, Upload, Edit3, Save, Plus, ImageIcon, Trash2, Pencil, Download, FileJson, Menu } = Icons;
-
-        const INITIAL_DATA = [
+        // 預設資料
+        const DEFAULT_SCENES = [
             {
-                id: 'zone-a',
-                name: '範例 A 區',
-                description: '請匯入資料或開始編輯',
-                coordinates: { top: '30%', left: '30%' }, 
-                color: 'bg-blue-500',
-                items: []
+                id: 'scene-1',
+                title: '部門聚餐',
+                participants: [
+                    { id: 1, name: '小明', group: '業務部', active: true, won: false },
+                    { id: 2, name: '小華', group: '業務部', active: true, won: false },
+                    { id: 3, name: '美美', group: '行銷部', active: true, won: false },
+                    { id: 4, name: '大壯', group: '工程部', active: true, won: false },
+                    { id: 5, name: '阿強', group: '工程部', active: true, won: false },
+                    { id: 6, name: '老闆', group: '管理層', active: false, won: false },
+                ],
+                prizes: [
+                    { id: 1, name: '現金 $1000', count: 3 },
+                    { id: 2, name: '特休一日券', count: 1 },
+                ],
+                history: [],
+                weights: {}
+            },
+            {
+                id: 'scene-2',
+                title: '年終尾牙',
+                participants: [
+                    { id: 1, name: '工程師A', group: '研發處', active: true, won: false },
+                    { id: 2, name: '設計師B', group: '設計處', active: true, won: false },
+                    { id: 3, name: 'PM C', group: '產品處', active: true, won: false },
+                ],
+                prizes: [
+                    { id: 1, name: 'iPhone 15', count: 1 },
+                ],
+                history: [],
+                weights: {}
             }
         ];
 
-        const StatusBadge = ({ status }) => {
-            const config = {
-                normal: { color: 'text-green-600 bg-green-50', icon: CheckCircle, text: '正常' },
-                warning: { color: 'text-yellow-600 bg-yellow-50', icon: AlertCircle, text: '注意' },
-                maintenance: { color: 'text-red-600 bg-red-50', icon: X, text: '維修' },
-            };
-            const current = config[status] || config.normal;
-            const IconComp = current.icon;
-            return (
-                <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${current.color} whitespace-nowrap`}>
-                    <IconComp size={12} /> {current.text}
-                </span>
-            );
-        };
-
-        function App() {
-            const [appTitle, setAppTitle] = useState('廠區盤點系統');
-            const [isEditingTitle, setIsEditingTitle] = useState(false);
-            const [inventoryData, setInventoryData] = useState(INITIAL_DATA);
-            const [activeZone, setActiveZone] = useState(null);
-            const [searchTerm, setSearchTerm] = useState('');
-            const [mapImage, setMapImage] = useState('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=2000&q=80');
+        const App = () => {
+            const [scenes, setScenes] = useState(DEFAULT_SCENES);
+            const [activeSceneId, setActiveSceneId] = useState('scene-1');
+            const [isSpinning, setIsSpinning] = useState(false);
+            const [displayParticipant, setDisplayParticipant] = useState(null);
             
-            const [isEditing, setIsEditing] = useState(false);
-            const [draggingId, setDraggingId] = useState(null);
-            const [markerSize, setMarkerSize] = useState(48);
-            const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+            const [showSettings, setShowSettings] = useState(false);
+            const [showWinnerModal, setShowWinnerModal] = useState(false);
+            const [lastWinner, setLastWinner] = useState(null);
+            const [selectedPrizeId, setSelectedPrizeId] = useState(null);
 
-            const mapRef = useRef(null);
-            const fileInputRef = useRef(null);
-            const dataInputRef = useRef(null);
-            const [itemFormMode, setItemFormMode] = useState('closed');
-            const [formData, setFormData] = useState({ id: '', name: '', quantity: 1, unit: '台', status: 'normal', image: null });
-            const itemFileInputRef = useRef(null);
+            const [showRedrawMenu, setShowRedrawMenu] = useState(false);
+            const [showRedrawModal, setShowRedrawModal] = useState(false);
+            const [isRedrawSpinning, setIsRedrawSpinning] = useState(false);
+            const [redrawDisplay, setRedrawDisplay] = useState(null);
+            const [redrawSelectedGroups, setRedrawSelectedGroups] = useState(new Set());
+            
+            const [newNameList, setNewNameList] = useState('');
+            const [newGroupName, setNewGroupName] = useState('一般'); 
+            const [newPrizeName, setNewPrizeName] = useState('');
+            const [newPrizeCount, setNewPrizeCount] = useState(1);
+            
+            const [dragOverGroup, setDragOverGroup] = useState(null);
+
+            const [visibleGroups, setVisibleGroups] = useState(new Set()); 
+
+            const [showAdminLogin, setShowAdminLogin] = useState(false);
+            const [showAdminPanel, setShowAdminPanel] = useState(false);
+            const [adminPasswordInput, setAdminPasswordInput] = useState('');
+            const [loginError, setLoginError] = useState(false);
+            const [adminTargetPrizeId, setAdminTargetPrizeId] = useState(null);
+
+            const timerRef = useRef(null);
+            const fileInputRef = useRef(null); 
+            const participantsInputRef = useRef(null); 
+
+            const currentScene = scenes.find(s => s.id === activeSceneId) || scenes[0];
 
             useEffect(() => {
-                if (window.innerWidth < 768) setMarkerSize(36);
-            }, []);
+                setSelectedPrizeId(null);
+                const groups = new Set();
+                currentScene.participants.forEach(p => groups.add(p.group || '未分類'));
+                setVisibleGroups(groups);
+            }, [activeSceneId, currentScene.participants.length]); 
 
-            // --- 圖片處理 (改用 Base64) ---
-            const handleImageUpload = async (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    try {
-                        const base64 = await fileToBase64(file);
-                        setMapImage(base64);
-                    } catch(e) { alert('圖片讀取失敗'); }
+            const currentPrize = useMemo(() => {
+                if (selectedPrizeId) {
+                    const p = currentScene.prizes.find(p => p.id === selectedPrizeId);
+                    if (p) return p;
+                }
+                return currentScene.prizes.find(p => p.count > 0) || currentScene.prizes[0];
+            }, [currentScene.prizes, selectedPrizeId]);
+
+            const groupedParticipants = useMemo(() => {
+                const groups = {};
+                currentScene.participants.forEach(p => {
+                    const gName = p.group || '未分類';
+                    if (!groups[gName]) groups[gName] = [];
+                    groups[gName].push(p);
+                });
+                return groups;
+            }, [currentScene.participants]);
+
+            const toggleGroupVisibility = (groupName) => {
+                const newVisible = new Set(visibleGroups);
+                if (newVisible.has(groupName)) {
+                    newVisible.delete(groupName);
+                } else {
+                    newVisible.add(groupName);
+                }
+                setVisibleGroups(newVisible);
+            };
+
+            const toggleAllGroups = () => {
+                const allGroups = Object.keys(groupedParticipants);
+                if (visibleGroups.size === allGroups.length) {
+                    setVisibleGroups(new Set());
+                } else {
+                    setVisibleGroups(new Set(allGroups));
                 }
             };
 
-            const handleItemImageUpload = async (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    try {
-                        const base64 = await fileToBase64(file);
-                        setFormData(prev => ({ ...prev, image: base64 }));
-                    } catch(e) { alert('圖片讀取失敗'); }
-                }
+            const handleExport = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(scenes));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "lucky_draw_backup.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
             };
 
-            const openAddMode = () => {
-                setFormData({ id: '', name: '', quantity: 1, unit: '台', status: 'normal', image: null });
-                setItemFormMode('add');
-            };
+            const handleImport = (event) => {
+                const fileObj = event.target.files && event.target.files[0];
+                if (!fileObj) return;
 
-            const openEditMode = (item) => {
-                setFormData({ ...item });
-                setItemFormMode('edit');
-            };
-
-            const handleSaveItem = () => {
-                if (!formData.id || !formData.name) { alert('請輸入財產編號與名稱'); return; }
-                const itemToSave = {
-                    ...formData,
-                    image: formData.image || 'https://placehold.co/150/gray/white?text=No+Image'
-                };
-                setInventoryData(prevData => prevData.map(zone => {
-                    if (zone.id === activeZone.id) {
-                        let newItems = itemFormMode === 'edit' ? zone.items.map(item => item.id === itemToSave.id ? itemToSave : item) : [itemToSave, ...zone.items];
-                        const updatedZone = { ...zone, items: newItems };
-                        setActiveZone(updatedZone);
-                        return updatedZone;
-                    }
-                    return zone;
-                }));
-                setItemFormMode('closed');
-            };
-
-            const handleDeleteItem = (itemId) => {
-                if(!confirm('確定刪除？')) return;
-                setInventoryData(prevData => prevData.map(zone => {
-                    if (zone.id === activeZone.id) {
-                        const updatedZone = { ...zone, items: zone.items.filter(item => item.id !== itemId) };
-                        setActiveZone(updatedZone);
-                        return updatedZone;
-                    }
-                    return zone;
-                }));
-            };
-
-            const handleUpdateZone = (key, value) => {
-                if (!activeZone) return;
-                const updatedZone = { ...activeZone, [key]: value };
-                setActiveZone(updatedZone);
-                setInventoryData(prev => prev.map(z => z.id === updatedZone.id ? updatedZone : z));
-            };
-
-            // --- 匯出/匯入 (包含 Base64 圖片) ---
-            const handleExportData = () => {
-                // 將地圖圖片也存入匯出檔，這樣換過的地圖也能被備份
-                const exportObj = {
-                    title: appTitle,
-                    mapImage: mapImage,
-                    data: inventoryData
-                };
-                const dataStr = JSON.stringify(exportObj, null, 2);
-                const blob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `factory_inventory_${new Date().toISOString().slice(0,10)}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            };
-
-            const handleImportData = (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
-                        const parsed = JSON.parse(e.target.result);
-                        // 相容性檢查：支援新版 (含圖片) 與舊版 (只含陣列)
-                        if (parsed.data && Array.isArray(parsed.data)) {
-                            setInventoryData(parsed.data);
-                            if(parsed.mapImage) setMapImage(parsed.mapImage);
-                            if(parsed.title) setAppTitle(parsed.title);
-                        } else if (Array.isArray(parsed)) {
-                            setInventoryData(parsed);
+                        const importedScenes = JSON.parse(e.target.result);
+                        if (Array.isArray(importedScenes)) {
+                            const safeScenes = importedScenes.map(s => ({
+                                ...s,
+                                weights: s.weights || {}
+                            }));
+                            setScenes(safeScenes);
+                            if (!safeScenes.find(s => s.id === activeSceneId)) {
+                                setActiveSceneId(safeScenes[0]?.id || 'scene-1');
+                            }
+                            alert("✅ 資料匯入成功！");
                         } else {
-                            throw new Error('格式不符');
+                            alert("❌ 檔案格式錯誤：應為場景陣列。");
                         }
-                        alert('匯入成功！圖片與資料已還原。');
-                        setActiveZone(null);
-                    } catch (error) { alert('匯入失敗：檔案格式不正確'); }
+                    } catch (error) {
+                        alert("❌ 匯入失敗：無法解析檔案。");
+                    }
+                };
+                reader.readAsText(fileObj);
+                event.target.value = null;
+            };
+
+            const handleExportParticipants = () => {
+                let csvContent = "\uFEFF名稱,部門\n";
+                if (currentScene.participants.length > 0) {
+                    currentScene.participants.forEach(p => {
+                        csvContent += `${p.name},${p.group || '一般'}\n`;
+                    });
+                } else {
+                    csvContent += "範例王小明,業務部\n";
+                }
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `participants_${currentScene.title}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const handleImportParticipants = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    const lines = text.split(/\r\n|\n/);
+                    const newParticipants = [];
+                    const newGroups = new Set(visibleGroups);
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (line) {
+                            const parts = line.split(',');
+                            const name = parts[0]?.trim();
+                            const group = parts[1]?.trim() || '一般';
+                            
+                            if (name) {
+                                newParticipants.push({
+                                    id: Date.now() + Math.random() + i,
+                                    name: name,
+                                    group: group,
+                                    active: true,
+                                    won: false
+                                });
+                                newGroups.add(group);
+                            }
+                        }
+                    }
+
+                    if (newParticipants.length > 0) {
+                        setScenes(prev => prev.map(scene => {
+                            if (scene.id !== activeSceneId) return scene;
+                            return {
+                                ...scene,
+                                participants: [...scene.participants, ...newParticipants]
+                            };
+                        }));
+                        setVisibleGroups(newGroups);
+                        alert(`✅ 成功匯入 ${newParticipants.length} 筆名單！`);
+                    } else {
+                        alert("⚠️ 檔案中似乎沒有有效資料，請檢查格式。");
+                    }
                 };
                 reader.readAsText(file);
-                event.target.value = '';
+                event.target.value = null;
             };
 
-            // 拖曳邏輯
-            const handleMouseDown = (e, id) => {
-                if (!isEditing) return;
-                e.stopPropagation();
-                setDraggingId(id);
-                setActiveZone(inventoryData.find(z => z.id === id));
+            const triggerConfetti = () => {
+                var duration = 3 * 1000;
+                var animationEnd = Date.now() + duration;
+                var defaults = { startVelocity: 40, spread: 360, ticks: 100, zIndex: 9999, scalar: 1.2 };
+                function randomInRange(min, max) { return Math.random() * (max - min) + min; }
+                var interval = setInterval(function() {
+                    var timeLeft = animationEnd - Date.now();
+                    if (timeLeft <= 0) return clearInterval(interval);
+                    var particleCount = 50 * (timeLeft / duration);
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+                }, 250);
             };
-            const handleTouchStart = (e, id) => {
-                if (!isEditing) return;
-                setDraggingId(id);
-                setActiveZone(inventoryData.find(z => z.id === id));
-            };
-            const handleMove = (clientX, clientY) => {
-                if (!draggingId || !mapRef.current) return;
-                const mapRect = mapRef.current.getBoundingClientRect();
-                let leftPercent = Math.max(0, Math.min(100, ((clientX - mapRect.left) / mapRect.width) * 100));
-                let topPercent = Math.max(0, Math.min(100, ((clientY - mapRect.top) / mapRect.height) * 100));
-                const updatedData = inventoryData.map(zone => zone.id === draggingId ? { ...zone, coordinates: { top: `${topPercent.toFixed(1)}%`, left: `${leftPercent.toFixed(1)}%` } } : zone);
-                setInventoryData(updatedData);
-                if (activeZone?.id === draggingId) setActiveZone(updatedData.find(z => z.id === draggingId));
-            };
-            const handleMouseMove = (e) => handleMove(e.clientX, e.clientY);
-            const handleTouchMove = (e) => { if(draggingId) e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); };
-            const handleEnd = () => setDraggingId(null);
 
-            useEffect(() => {
-                if (draggingId) {
-                    window.addEventListener('mouseup', handleEnd); window.addEventListener('mousemove', handleMouseMove);
-                    window.addEventListener('touchend', handleEnd); window.addEventListener('touchmove', handleTouchMove, { passive: false });
+            const getWeightedWinner = (candidates, prizeId) => {
+                const weightsMap = currentScene.weights?.[prizeId] || {};
+                let totalWeight = 0;
+                const weightedCandidates = candidates.map(p => {
+                    const weight = weightsMap[p.id] !== undefined ? weightsMap[p.id] : 1;
+                    totalWeight += weight;
+                    return { ...p, weight };
+                });
+                if (totalWeight <= 0) return null;
+                let random = Math.random() * totalWeight;
+                for (const p of weightedCandidates) {
+                    if (random < p.weight) return p;
+                    random -= p.weight;
                 }
-                return () => {
-                    window.removeEventListener('mouseup', handleEnd); window.removeEventListener('mousemove', handleMouseMove);
-                    window.removeEventListener('touchend', handleEnd); window.removeEventListener('touchmove', handleTouchMove);
-                };
-            }, [draggingId]);
+                return weightedCandidates[weightedCandidates.length - 1];
+            };
 
-            const displayItems = useMemo(() => {
-                if (activeZone) return activeZone.items;
-                if (searchTerm.trim() !== '') {
-                    const results = [];
-                    inventoryData.forEach(zone => zone.items.forEach(item => {
-                        if (item.name.includes(searchTerm) || item.id.includes(searchTerm)) results.push({ ...item, zoneName: zone.name });
-                    }));
-                    return results;
+            const startDraw = () => {
+                const candidates = currentScene.participants.filter(p => 
+                    p.active && 
+                    !p.won && 
+                    visibleGroups.has(p.group || '未分類')
+                );
+                
+                if (!currentPrize) { alert("😱 目前沒有獎項！"); return; }
+                if (currentPrize.count <= 0) { alert("😱 這個獎項已經抽完了！請選擇其他獎項。"); return; }
+                if (candidates.length === 0) { alert("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
+
+                setIsSpinning(true);
+                setShowWinnerModal(false);
+                let counter = 0;
+                const speed = 40; 
+                
+                // 恢復為原本的快速閃爍動畫 (Reverted to Flashing Names)
+                timerRef.current = setInterval(() => {
+                    const randomIdx = Math.floor(Math.random() * candidates.length);
+                    setDisplayParticipant(candidates[randomIdx]);
+                    counter++;
+                }, speed);
+
+                setTimeout(() => {
+                    clearInterval(timerRef.current);
+                    
+                    const winner = getWeightedWinner(candidates, currentPrize.id);
+                    if (!winner) {
+                        setIsSpinning(false);
+                        alert("⚠️ 所有候選人的中獎機率皆為 0，無法抽出得主！");
+                        return;
+                    }
+
+                    setIsSpinning(false);
+                    setLastWinner({ person: winner, prize: currentPrize });
+                    setDisplayParticipant(winner);
+                    triggerConfetti();
+                    setShowWinnerModal(true);
+                }, 2500); 
+            };
+
+            const confirmWin = () => {
+                if (!lastWinner?.person) return;
+                const { person: winner, prize } = lastWinner;
+                triggerConfetti();
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    const updatedParticipants = scene.participants.map(p => p.id === winner.id ? { ...p, won: true } : p);
+                    const updatedPrizes = scene.prizes.map(p => p.id === prize.id ? { ...p, count: p.count - 1 } : p);
+                    const newHistory = [{
+                        time: new Date().toLocaleTimeString('en-US', {hour12: false, hour: "numeric", minute: "numeric", second: "numeric"}),
+                        personName: winner.name, personGroup: winner.group, prizeName: prize.name, prizeId: prize.id
+                    }, ...scene.history];
+                    return { ...scene, participants: updatedParticipants, prizes: updatedPrizes, history: newHistory };
+                }));
+                setShowWinnerModal(false);
+                setShowRedrawModal(false); 
+            };
+
+            const handleRedrawClick = () => { 
+                setShowWinnerModal(false); 
+                setRedrawSelectedGroups(new Set());
+                setShowRedrawMenu(true); 
+            };
+
+            const handleRedrawCancel = () => {
+                setShowRedrawMenu(false);
+                if (lastWinner) {
+                    setShowWinnerModal(true);
                 }
-                return [];
-            }, [activeZone, searchTerm, inventoryData]);
+            };
 
-            useEffect(() => { if (activeZone && window.innerWidth < 768) setIsSidebarOpen(true); }, [activeZone]);
+            const toggleRedrawGroup = (groupName) => {
+                const newSet = new Set(redrawSelectedGroups);
+                if (newSet.has(groupName)) {
+                    newSet.delete(groupName);
+                } else {
+                    newSet.add(groupName);
+                }
+                setRedrawSelectedGroups(newSet);
+            };
+
+            const selectAllRedrawGroups = () => {
+                const allGroups = Object.keys(groupedParticipants);
+                if (redrawSelectedGroups.size === allGroups.length) {
+                    setRedrawSelectedGroups(new Set());
+                } else {
+                    setRedrawSelectedGroups(new Set(allGroups));
+                }
+            };
+
+            const executeRedraw = (targetGroups) => {
+                if (!currentPrize || currentPrize.count <= 0) { alert("😱 這個獎項已經發完了！無法重抽。"); return; }
+                
+                if (targetGroups.size === 0) {
+                     alert("請至少選擇一個群組！");
+                     return;
+                }
+
+                const candidates = currentScene.participants.filter(p => 
+                    p.active && 
+                    !p.won && 
+                    targetGroups.has(p.group || '未分類')
+                );
+                
+                if (candidates.length === 0) { alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); return; }
+                
+                const winner = getWeightedWinner(candidates, currentPrize.id);
+                if (!winner) { 
+                    alert("⚠️ 該群組所有候選人的權重皆為 0，無法抽出！"); 
+                    return; 
+                }
+
+                setShowRedrawMenu(false); 
+                setShowRedrawModal(true); 
+                setIsRedrawSpinning(true);
+                setLastWinner({ person: winner, prize: currentPrize });
+
+                let counter = 0; const speed = 50;
+                if (timerRef.current) clearInterval(timerRef.current);
+                timerRef.current = setInterval(() => {
+                    const randomIdx = Math.floor(Math.random() * candidates.length);
+                    setRedrawDisplay(candidates[randomIdx]);
+                    counter++;
+                }, speed);
+
+                setTimeout(() => {
+                    clearInterval(timerRef.current);
+                    setIsRedrawSpinning(false); 
+                    setRedrawDisplay(winner); 
+                    triggerConfetti();
+                }, 2500);
+            };
+
+            const toggleParticipantActive = (pId) => {
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    return { ...scene, participants: scene.participants.map(p => p.id === pId ? { ...p, active: !p.active } : p) };
+                }));
+            };
+
+            const deleteParticipant = (pId) => {
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    return { ...scene, participants: scene.participants.filter(p => p.id !== pId) };
+                }));
+            };
+
+            const handleAddNames = () => {
+                if (!newNameList.trim()) return;
+                const names = newNameList.split('\n').filter(n => n.trim() !== '');
+                const groupToUse = newGroupName.trim() || '一般';
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    const newParticipants = names.map(name => ({ id: Date.now() + Math.random(), name: name.trim(), group: groupToUse, active: true, won: false }));
+                    return { ...scene, participants: [...scene.participants, ...newParticipants] };
+                }));
+                setVisibleGroups(prev => new Set(prev).add(groupToUse));
+                setNewNameList('');
+            };
+
+            const handleAdminLogin = () => {
+                if (adminPasswordInput === '355053') { setShowAdminLogin(false); setAdminPasswordInput(''); setLoginError(false); const firstPrize = currentScene.prizes[0]; setAdminTargetPrizeId(firstPrize ? firstPrize.id : null); setShowAdminPanel(true); } else { setLoginError(true); }
+            };
+
+            const updateWeight = (participantId, weight) => {
+                if (!adminTargetPrizeId) return;
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    const newWeights = { ...scene.weights };
+                    if (!newWeights[adminTargetPrizeId]) newWeights[adminTargetPrizeId] = {};
+                    newWeights[adminTargetPrizeId][participantId] = weight;
+                    return { ...scene, weights: newWeights };
+                }));
+            };
+
+            const handleDragStart = (e, participantId) => { e.dataTransfer.setData("text/plain", participantId); e.dataTransfer.effectAllowed = "move"; e.target.classList.add("dragging"); };
+            const handleDragEnd = (e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); };
+            const handleDragOver = (e, groupName) => { e.preventDefault(); setDragOverGroup(groupName); };
+            const handleDrop = (e, targetGroup) => {
+                e.preventDefault(); setDragOverGroup(null);
+                const participantId = Number(e.dataTransfer.getData("text/plain"));
+                if (!participantId) return;
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    const updatedParticipants = scene.participants.map(p => { if (p.id === participantId) { return { ...p, group: targetGroup }; } return p; });
+                    return { ...scene, participants: updatedParticipants };
+                }));
+            };
+
+            const addNewScene = () => {
+                const newId = `scene-${Date.now()}`;
+                const newScene = { id: newId, title: `新活動 ${scenes.length + 1}`, participants: [], prizes: [], history: [], weights: {} };
+                setScenes([...scenes, newScene]); setActiveSceneId(newId);
+            };
+
+            const deleteScene = (e, id) => {
+                e.stopPropagation(); if (scenes.length === 1) return;
+                const newScenes = scenes.filter(s => s.id !== id); setScenes(newScenes);
+                if (activeSceneId === id) setActiveSceneId(newScenes[0].id);
+            };
+
+            const addPrize = () => {
+                if (!newPrizeName.trim()) return;
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    return { ...scene, prizes: [...scene.prizes, { id: Date.now(), name: newPrizeName, count: parseInt(newPrizeCount) }] };
+                }));
+                setNewPrizeName(''); setNewPrizeCount(1);
+            };
+
+            const updateSceneTitle = (title) => {
+                 setScenes(prev => prev.map(scene => { if (scene.id !== activeSceneId) return scene; return { ...scene, title }; }));
+            }
 
             return (
-                <div className="flex flex-col h-full bg-gray-50 text-slate-800 font-sans overflow-hidden">
-                    <header className="bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm z-20 shrink-0 h-16 safe-top">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                            <div className="bg-blue-600 text-white p-1.5 rounded-lg shadow-blue-200 shadow-lg shrink-0"><Package size={20} /></div>
-                            <div className="min-w-0">
-                                {isEditingTitle ? (
-                                    <input autoFocus className="text-lg font-bold text-slate-900 border-b-2 border-blue-500 focus:outline-none w-full bg-transparent" value={appTitle} onChange={(e) => setAppTitle(e.target.value)} onBlur={() => setIsEditingTitle(false)} />
-                                ) : (
-                                    <h1 className="text-lg font-bold text-slate-900 cursor-pointer truncate flex items-center gap-1" onClick={() => setIsEditingTitle(true)}>
-                                        {appTitle} <Pencil size={12} className="text-slate-400" />
-                                    </h1>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-2 bg-slate-100 rounded-full text-slate-600 active:bg-slate-200"><Menu size={20} /></button>
-                        </div>
-                    </header>
+                <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto flex flex-col">
+                    <input type="file" ref={fileInputRef} onChange={handleImport} style={{display: 'none'}} accept=".json" />
+                    <input type="file" ref={participantsInputRef} onChange={handleImportParticipants} style={{display: 'none'}} accept=".csv" />
 
-                    <div className="md:hidden px-4 py-2 bg-white border-b z-10">
-                         <div className="relative w-full">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input type="text" placeholder="搜尋設備..." className="w-full pl-9 pr-4 py-2 bg-slate-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); if(e.target.value) { setActiveZone(null); setIsSidebarOpen(true); } }} />
+                    {/* Header */}
+                    <div className="flex flex-wrap gap-3 mb-6 items-center">
+                        <div className="text-3xl font-black text-pink-600 mr-4 flex items-center gap-2 drop-shadow-sm select-none">
+                            LUCKY DRAW
+                        </div>
+                        {scenes.map(scene => (
+                            <div key={scene.id} onClick={() => setActiveSceneId(scene.id)} className={`relative px-6 py-3 rounded-xl cursor-pointer transition-all flex items-center gap-2 font-bold shadow-md select-none ${activeSceneId === scene.id ? 'bg-gradient-to-br from-pink-500 to-rose-600 text-white scale-105 shadow-pink-300 ring-4 ring-pink-200' : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-pink-500'}`}>
+                                {activeSceneId === scene.id ? ( <input value={scene.title} onChange={(e) => updateSceneTitle(e.target.value)} className="bg-transparent border-b-2 border-white/50 focus:border-white focus:outline-none w-24 sm:w-auto text-white placeholder-white/70" /> ) : ( <span>{scene.title}</span> )}
+                                {activeSceneId === scene.id && scenes.length > 1 && ( <button onClick={(e) => deleteScene(e, scene.id)} className="text-white/70 hover:text-white ml-2 bg-black/10 rounded-full p-0.5"> <X size={14} /> </button> )}
+                            </div>
+                        ))}
+                        <button onClick={addNewScene} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-gray-400 hover:text-pink-500 hover:bg-pink-50 shadow-sm transition-all border-2 border-dashed border-gray-300 hover:border-pink-300"> <Plus size={24} /> </button>
+                        <div className="ml-auto flex gap-2">
+                            <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 hover:text-pink-500 transition-all font-bold border border-gray-200" title="匯入設定"><Upload size={18} /><span className="hidden sm:inline">匯入</span></button>
+                            <button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 hover:text-pink-500 transition-all font-bold border border-gray-200" title="匯出設定"><Download size={18} /><span className="hidden sm:inline">匯出</span></button>
+                            <button onClick={() => { setShowAdminLogin(true); setLoginError(false); }} className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-black hover:scale-105 transition-all font-bold border border-gray-900" title="管理員登入"><Shield size={18} /></button>
+                            <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-gray-800 hover:scale-105 transition-all font-bold ring-2 ring-gray-200"><Settings size={20} /><span>設定</span></button>
                         </div>
                     </div>
 
-                    <div className="flex flex-1 overflow-hidden relative">
-                        <main className="flex-1 relative bg-slate-200 overflow-hidden flex items-center justify-center p-2 md:p-4">
-                            <div ref={mapRef} className={`relative w-full h-full md:h-auto md:max-w-4xl md:aspect-[16/9] bg-white rounded-xl shadow-2xl overflow-hidden border-2 border-white transition-all duration-300 group/map ${isEditing ? 'ring-4 ring-yellow-400 ring-opacity-50' : ''}`}>
-                                <img src={mapImage} alt="廠區平面圖" className="absolute inset-0 w-full h-full object-cover opacity-90 select-none pointer-events-none" />
-                                <div className="absolute top-2 right-2 md:top-4 md:right-4 z-30 flex flex-col gap-2">
-                                    <button onClick={() => { setIsEditing(!isEditing); setActiveZone(null); setItemFormMode('closed'); }} className={`px-3 py-2 rounded-lg shadow-md backdrop-blur-sm transition-all flex items-center gap-1 text-xs font-bold border ${isEditing ? 'bg-yellow-500 text-white border-yellow-600 animate-pulse' : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200'}`}>
-                                        {isEditing ? <Save size={14} /> : <Edit3 size={14} />} {isEditing ? '完成' : '編輯'}
-                                    </button>
-                                    {!isEditing && (
-                                        <>
-                                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                                            <button onClick={() => fileInputRef.current.click()} className="bg-white/80 hover:bg-white text-slate-700 px-3 py-2 rounded-lg shadow-md backdrop-blur-sm transition-all flex items-center gap-1 text-xs font-bold border border-slate-200">
-                                                <Upload size={14} /> 換圖
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                                {isEditing && (
-                                    <div className="absolute top-2 left-2 z-30 flex flex-col gap-2 max-w-[200px]">
-                                        <div className="bg-white/90 backdrop-blur px-2 py-1.5 rounded-lg shadow-md border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-700">
-                                            <span>標示大小</span> <input type="range" min="24" max="72" value={markerSize} onChange={(e) => setMarkerSize(Number(e.target.value))} className="w-20 accent-blue-600" />
-                                        </div>
-                                    </div>
-                                )}
-                                {inventoryData.map((zone) => (
-                                    <div key={zone.id} onMouseDown={(e) => handleMouseDown(e, zone.id)} onTouchStart={(e) => handleTouchStart(e, zone.id)} onClick={() => { if (!isEditing) { setActiveZone(zone); setSearchTerm(''); setItemFormMode('closed'); } }} className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 z-10 ${activeZone?.id === zone.id ? 'scale-125 z-20' : ''} ${isEditing ? 'cursor-move' : 'cursor-pointer'} ${draggingId === zone.id ? 'scale-125 z-50 pointer-events-none' : ''}`} style={{ top: zone.coordinates.top, left: zone.coordinates.left, touchAction: 'none' }}>
-                                        {!isEditing && <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${zone.color}`}></span>}
-                                        <div className={`relative inline-flex items-center justify-center rounded-full shadow-lg border-2 border-white text-white ${zone.color} ${isEditing && 'ring-2 ring-white ring-offset-2 ring-offset-yellow-500'}`} style={{ width: `${markerSize}px`, height: `${markerSize}px` }}>
-                                            <MapPin size={markerSize * 0.5} fill="currentColor" />
-                                        </div>
-                                        {(!isEditing || activeZone?.id === zone.id) && <div className="absolute left-1/2 -translate-x-1/2 mt-1 px-2 py-0.5 bg-slate-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30">{zone.name}</div>}
-                                    </div>
-                                ))}
+                    {/* Main Content Area */}
+                    <main className="impact-panel p-6 md:p-8 relative overflow-hidden flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                        {/* Left: The Wheel */}
+                        <div className="lg:col-span-7 flex flex-col items-center justify-center min-h-[500px]">
+                            <div className="mb-10 text-center w-full max-w-lg">
+                                <div className="text-pink-500 font-black mb-2 tracking-widest text-sm uppercase bg-pink-100 inline-block px-3 py-1 rounded-full">Current Prize</div>
+                                <h2 className="text-5xl md:text-6xl font-black text-gray-800 flex items-center justify-center gap-4 drop-shadow-sm my-2">
+                                    <Gift className="text-rose-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
+                                    <span className="truncate">{currentPrize ? currentPrize.name : "—"}</span>
+                                </h2>
+                                <div className="flex justify-center mt-2"><span className="bg-gray-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">剩餘數量: {currentPrize ? currentPrize.count : 0}</span></div>
                             </div>
-                        </main>
 
-                        <aside className={`fixed md:absolute inset-0 md:inset-auto md:top-0 md:bottom-0 md:right-0 z-40 bg-white/95 backdrop-blur-sm md:bg-white md:w-96 md:shadow-2xl md:border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${isSidebarOpen || (window.innerWidth >= 768 && (activeZone || searchTerm)) ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-x-full'}`}>
-                            <div className="md:hidden flex justify-center py-2" onClick={() => setIsSidebarOpen(false)}><div className="w-12 h-1.5 bg-slate-300 rounded-full"></div></div>
-                            <div className={`px-4 py-3 border-b flex items-start justify-between ${isEditing ? 'bg-yellow-50' : 'bg-slate-50'}`}>
-                                <div className="flex-1 mr-4">
-                                    {isEditing && activeZone ? (
-                                        <div className="space-y-2 animate-in fade-in">
-                                            <div className="flex items-center gap-2 text-yellow-700 font-bold text-xs"><Edit3 size={12}/> 編輯分區</div>
-                                            <input type="text" value={activeZone.name} onChange={(e) => handleUpdateZone('name', e.target.value)} className="w-full px-2 py-1.5 border rounded bg-white font-bold text-slate-800 text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
-                                            <div className="flex gap-2 mt-1">{['bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-red-500'].map(c => (<button key={c} onClick={() => handleUpdateZone('color', c)} className={`w-5 h-5 rounded-full ${c} ${activeZone.color === c ? 'ring-2 ring-offset-1 ring-slate-400' : ''}`} />))}</div>
+                            {/* The Big Animated Card (Reverted to Flashing Pop) */}
+                            <div className={`w-full max-w-2xl aspect-[16/9] bg-gradient-to-br from-white to-gray-50 rounded-[32px] flex items-center justify-center relative overflow-hidden transition-all ${isSpinning ? 'rainbow-border' : 'border-[6px] border-yellow-400 shadow-[0_15px_40px_-10px_rgba(251,191,36,0.5)]'}`}>
+                                <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
+                                <div className="z-10 text-center w-full px-4">
+                                    {isSpinning ? (
+                                        <div className="animate-pop">
+                                            <div className="text-6xl md:text-8xl font-black text-gray-900 tracking-tight">{displayParticipant?.name}</div>
+                                            <div className="text-xl md:text-2xl font-bold text-gray-500 mt-2 tracking-widest">{displayParticipant?.group || ''}</div>
                                         </div>
                                     ) : (
-                                        <>
-                                            <h2 className="text-lg font-bold text-slate-800">{activeZone ? activeZone.name : (searchTerm ? '搜尋結果' : '清單')}</h2>
-                                            <p className="text-xs text-slate-500 mt-0.5">{activeZone ? activeZone.description : (searchTerm ? `關鍵字: "${searchTerm}"` : '請點擊地圖區域')}</p>
-                                        </>
+                                        <div className="flex flex-col items-center animate-bounce-slow opacity-60">
+                                            <span className="text-8xl mb-4">🎰</span>
+                                            <span className="text-3xl font-black text-gray-400 tracking-wider">READY TO DRAW</span>
+                                        </div>
                                     )}
                                 </div>
-                                <button onClick={() => { setActiveZone(null); setSearchTerm(''); setIsSidebarOpen(false); }} className="p-1 hover:bg-slate-200 rounded-full"><X size={20} className="text-slate-500" /></button>
                             </div>
+                            <button onClick={startDraw} disabled={isSpinning || !currentPrize || currentPrize.count === 0} className={`mt-10 w-full max-w-sm py-5 rounded-2xl text-3xl font-black shadow-[0_10px_0_0_rgba(0,0,0,0.2)] transform transition-all active:shadow-none active:translate-y-[10px] ${(isSpinning || !currentPrize || currentPrize.count === 0) ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-y-[10px]' : 'bg-gradient-to-r from-rose-500 to-pink-600 text-white hover:brightness-110 shadow-[0_10px_0_0_#9d174d]'}`}>{isSpinning ? 'SPINNING...' : (currentPrize && currentPrize.count === 0 ? '獎項已抽完' : '開始抽獎 !')}</button>
+                        </div>
 
-                            <div className="flex-1 overflow-y-auto p-4 safe-bottom">
-                                {activeZone && itemFormMode !== 'closed' && (
-                                    <div className="mb-4 bg-slate-50 p-3 rounded-xl border border-blue-200 shadow-sm">
-                                        <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-slate-700 text-sm">{itemFormMode === 'add' ? '新增' : '編輯'}</h3><button onClick={() => setItemFormMode('closed')}><X size={16} className="text-slate-400"/></button></div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-12 h-12 bg-slate-200 rounded flex items-center justify-center overflow-hidden" onClick={() => itemFileInputRef.current.click()}>{formData.image ? <img src={formData.image} className="w-full h-full object-cover"/> : <ImageIcon size={20} className="text-slate-400"/>}</div>
-                                                <input type="file" ref={itemFileInputRef} onChange={handleItemImageUpload} accept="image/*" className="hidden" /><button onClick={() => itemFileInputRef.current.click()} className="text-xs border px-2 py-1 rounded bg-white">上傳</button>
+                        {/* Right: Info Panel */}
+                        <div className="lg:col-span-5 flex flex-col gap-6">
+                            {/* Prize List */}
+                            <div className="flex-1 bg-white rounded-3xl p-1 shadow-inner border-2 border-pink-100 flex flex-col h-[320px]">
+                                <div className="bg-pink-50 p-4 rounded-t-[20px] flex items-center justify-between border-b-2 border-pink-100">
+                                    <h3 className="font-black text-xl text-pink-600 flex items-center gap-2"><Trophy size={24} className="text-yellow-500" /> 獎項清單 PRIZES</h3>
+                                    <span className="text-xs font-bold bg-pink-200 text-pink-700 px-2 py-1 rounded">{currentScene.prizes.reduce((acc, p) => acc + p.count, 0)} items left</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                    {currentScene.prizes.map((prize, idx) => {
+                                        const isActivePrize = currentPrize && currentPrize.id === prize.id;
+                                        return (
+                                            <div key={prize.id} onClick={() => setSelectedPrizeId(prize.id)} className={`relative p-4 rounded-xl flex justify-between items-center transition-all cursor-pointer ${prize.count === 0 ? 'bg-gray-100 border-2 border-gray-200 opacity-60 grayscale' : (isActivePrize ? 'selected-prize-card' : 'bg-white list-card-shadow')}`}>
+                                                <div className="flex flex-col">
+                                                    <span className={`font-black text-lg ${prize.count === 0 ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{prize.name}</span>
+                                                    {isActivePrize && prize.count > 0 && <span className="text-[10px] font-bold text-pink-500 uppercase tracking-wider mt-1">Current Target</span>}
+                                                </div>
+                                                <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-rose-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
                                             </div>
-                                            <input type="text" placeholder="編號" className="w-full px-2 py-1.5 border rounded text-sm" value={formData.id} onChange={(e) => setFormData({...formData, id: e.target.value})} disabled={itemFormMode === 'edit'} />
-                                            <input type="text" placeholder="名稱" className="w-full px-2 py-1.5 border rounded text-sm" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                                            <div className="flex gap-2">
-                                                <input type="number" className="w-1/3 px-2 py-1.5 border rounded text-sm" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value) || 1})} />
-                                                <input type="text" placeholder="單位" className="w-2/3 px-2 py-1.5 border rounded text-sm" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} />
-                                            </div>
-                                            <select className="w-full px-2 py-1.5 border rounded text-sm bg-white" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}><option value="normal">正常</option><option value="warning">注意</option><option value="maintenance">維修</option></select>
-                                            <button onClick={handleSaveItem} className="w-full bg-blue-600 text-white py-1.5 rounded text-sm font-bold flex items-center justify-center gap-1"><Save size={14} /> 儲存</button>
-                                        </div>
-                                    </div>
-                                )}
-                                {activeZone && itemFormMode === 'closed' && !isEditing && (
-                                    <button onClick={openAddMode} className="w-full mb-4 py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-xl flex items-center justify-center gap-1 hover:bg-blue-50 font-bold text-sm"><Plus size={16} /> 新增項目</button>
-                                )}
-                                <div className="space-y-3 pb-20">
-                                    {displayItems.length > 0 ? displayItems.map((item) => (
-                                        <div key={item.id} className="bg-white border rounded-xl p-2 shadow-sm flex gap-3 items-start relative">
-                                            <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border"><img src={item.image} className="w-full h-full object-cover" /></div>
-                                            <div className="flex-1 min-w-0 pt-0.5">
-                                                <h3 className="font-bold text-slate-800 truncate text-sm">{item.name}</h3><p className="text-[10px] text-slate-400 font-mono mb-1">{item.id}</p>
-                                                <div className="flex items-center gap-1 mb-1"><span className="text-[10px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded border">{item.quantity} {item.unit}</span></div><StatusBadge status={item.status} />
-                                            </div>
-                                            {activeZone && (<div className="absolute bottom-2 right-2 flex gap-2"><button onClick={() => openEditMode(item)} className="text-slate-400 hover:text-blue-500"><Pencil size={14} /></button><button onClick={() => handleDeleteItem(item.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button></div>)}
-                                        </div>
-                                    )) : <div className="text-center py-8 text-slate-400"><Package size={32} className="mx-auto mb-2 opacity-20" /><p className="text-xs">無資料</p></div>}
+                                        );
+                                    })}
+                                    {currentScene.prizes.length === 0 && <div className="h-full flex flex-col items-center justify-center text-gray-300"><Gift size={48} className="mb-2 opacity-20" /><p className="font-bold">暫無獎項</p></div>}
                                 </div>
                             </div>
-
-                            <div className="p-3 border-t bg-slate-50 flex gap-2 safe-bottom">
-                                <button onClick={handleExportData} className="flex-1 bg-slate-700 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1"><Download size={14} /> 匯出 (存檔)</button>
-                                <button onClick={() => dataInputRef.current.click()} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1"><FileJson size={14} /> 匯入 (讀檔)</button>
-                                <input type="file" ref={dataInputRef} onChange={handleImportData} accept=".json" className="hidden" />
+                            {/* Winner History */}
+                            <div className="flex-1 bg-gray-50 rounded-3xl p-1 border-2 border-gray-200 flex flex-col h-[320px]">
+                                <div className="bg-gray-100 p-4 rounded-t-[20px] border-b-2 border-gray-200">
+                                    <h3 className="font-black text-xl text-gray-600 flex items-center gap-2"><Users size={24} className="text-gray-500"/> {currentPrize ? `${currentPrize.name} 得主` : '中獎紀錄'}</h3>
+                                </div>
+                                <ul className="flex-1 overflow-y-auto p-4 space-y-2">
+                                    {currentScene.history.filter(record => !currentPrize || record.prizeId === currentPrize.id).map((record, idx) => (
+                                        <li key={idx} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-gray-100 animate-pop">
+                                            <span className="font-mono text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{record.time}</span>
+                                            <div className="flex flex-col flex-1">
+                                                <span className="font-black text-lg text-gray-800">{record.personName}</span>
+                                                {record.personGroup && <span className="text-xs text-gray-400 font-bold">{record.personGroup}</span>}
+                                            </div>
+                                            <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">{record.prizeName}</span>
+                                        </li>
+                                    ))}
+                                    {currentScene.history.filter(record => !currentPrize || record.prizeId === currentPrize.id).length === 0 && (
+                                        <div className="h-full flex flex-col items-center justify-center text-gray-300"><Users size={48} className="mb-2 opacity-20" /><p className="font-bold">{currentScene.history.length > 0 ? "此獎項尚未抽出得主" : "等待開獎..."}</p></div>
+                                    )}
+                                </ul>
                             </div>
-                        </aside>
-                    </div>
+                        </div>
+                    </main>
+
+                    {/* Modals */}
+                    
+                    {/* Admin Login */}
+                    {showAdminLogin && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAdminLogin(false)}>
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-pop border-2 border-gray-800" onClick={e => e.stopPropagation()}>
+                                <h3 className="font-black text-xl text-gray-800 mb-4 flex items-center gap-2"><Shield size={20}/> 管理員登入</h3>
+                                <input type="password" placeholder="請輸入密碼" className={`w-full border-2 rounded-lg p-3 text-center mb-2 focus:outline-none font-bold transition-all ${loginError ? 'border-red-500 bg-red-50 text-red-600' : 'border-gray-300 focus:border-gray-800'}`} value={adminPasswordInput} onChange={e => { setAdminPasswordInput(e.target.value); if(loginError) setLoginError(false); }} autoFocus onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()} />
+                                <div className={`text-red-500 text-sm font-bold text-center mb-4 h-5 ${loginError ? 'opacity-100 animate-shake' : 'opacity-0'}`}>{loginError ? <span className="flex items-center justify-center gap-1"><AlertTriangle size={14}/> 密碼錯誤，請重試！</span> : ''}</div>
+                                <div className="flex gap-3">
+                                    <button onClick={handleAdminLogin} className="flex-1 bg-green-500 text-white py-3 rounded-lg font-bold hover:bg-green-600 transition shadow-md">登入</button>
+                                    <button onClick={() => setShowAdminLogin(false)} className="flex-1 bg-red-500 text-white py-3 rounded-lg font-bold hover:bg-red-600 transition shadow-md">取消</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Admin Panel */}
+                    {showAdminPanel && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAdminPanel(false)}>
+                            <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-pop overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="p-5 border-b flex justify-between items-center bg-gray-900 text-white">
+                                    <h2 className="font-black text-2xl flex items-center gap-2"><Shield className="text-yellow-400"/> 機率控制台</h2>
+                                    <button onClick={() => setShowAdminPanel(false)} className="p-2 hover:bg-gray-700 rounded-full transition"><X/></button>
+                                </div>
+                                <div className="p-6 bg-gray-100 flex items-center gap-4 border-b">
+                                    <span className="font-bold text-gray-700">設定目標獎項：</span>
+                                    <select className="p-2 rounded-lg border-2 border-gray-300 font-bold flex-1 max-w-md" value={adminTargetPrizeId || ''} onChange={(e) => setAdminTargetPrizeId(parseInt(e.target.value))}>
+                                        {currentScene.prizes.map(p => ( <option key={p.id} value={p.id}>{p.name} (剩餘 {p.count})</option> ))}
+                                    </select>
+                                </div>
+                                <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                                    {Object.entries(groupedParticipants).map(([groupName, participants]) => (
+                                        <div key={groupName} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                                            <div className="bg-gray-50 px-4 py-2 font-bold text-gray-700 flex items-center gap-2 border-b"><Building size={16}/> {groupName}</div>
+                                            <div className="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                                {participants.map(p => {
+                                                    const weight = currentScene.weights?.[adminTargetPrizeId]?.[p.id] !== undefined ? currentScene.weights[adminTargetPrizeId][p.id] : 1;
+                                                    const isOn = weight > 0;
+                                                    return (
+                                                        <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border-2 transition-colors ${isOn ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-200'}`}>
+                                                            <span className={`font-bold truncate mr-2 ${p.won ? 'text-gray-400 line-through' : (isOn ? 'text-gray-800' : 'text-gray-400')}`}>{p.name}</span>
+                                                            <button onClick={() => !p.won && updateWeight(p.id, isOn ? 0 : 1)} disabled={p.won} className={`relative w-16 h-8 rounded-full transition-all duration-300 shadow-inner flex items-center shrink-0 focus:outline-none ${isOn ? 'bg-green-500' : 'bg-gray-300'} ${p.won ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}`}>
+                                                                <span className={`absolute left-2 text-[10px] font-black text-white transition-opacity ${isOn ? 'opacity-100' : 'opacity-0'}`}>ON</span>
+                                                                <span className={`absolute right-2 text-[10px] font-black text-gray-500 transition-opacity ${isOn ? 'opacity-0' : 'opacity-100'}`}>OFF</span>
+                                                                <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 absolute top-1 left-1 flex items-center justify-center ${isOn ? 'translate-x-8' : 'translate-x-0'}`}>
+                                                                    <div className={`w-2 h-2 rounded-full transition-colors ${isOn ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                                                </div>
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-4 bg-gray-50 text-center text-sm text-gray-500 font-bold border-t">設定說明：切換為 <span className="text-green-600">ON</span> 表示有機會中獎；<span className="text-gray-400">OFF</span> 則絕對不會中該獎項 (權重設為 0)。</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Settings Modal */}
+                    {showSettings && (
+                        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowSettings(false)}>
+                            <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl animate-pop overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="p-5 border-b flex justify-between items-center bg-gray-50">
+                                    <h2 className="font-black text-2xl text-gray-800 flex items-center gap-2">設定 / Settings</h2>
+                                    <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-200 rounded-full transition"><X/></button>
+                                </div>
+                                <div className="p-8 overflow-y-auto flex-1 space-y-8">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="font-bold text-gray-900 flex items-center gap-2"><Plus size={18}/> 快速新增人員</h3>
+                                            <div className="flex gap-2">
+                                                <button onClick={handleExportParticipants} className="flex items-center gap-1 text-xs font-bold text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 px-3 py-1.5 rounded-lg transition" title="下載目前的 CSV，可用於 Excel 編輯"><Download size={14}/> 匯出名單 (含格式)</button>
+                                                <button onClick={() => participantsInputRef.current.click()} className="flex items-center gap-1 text-xs font-bold text-white bg-pink-500 hover:bg-pink-600 px-3 py-1.5 rounded-lg transition shadow-sm" title="上傳 CSV 檔案加入名單"><Upload size={14}/> 匯入名單</button>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col gap-3 bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-gray-500">部門/群組:</span>
+                                                <input type="text" className="border-2 border-gray-200 rounded-lg p-2 text-sm w-40 focus:border-pink-500 focus:outline-none" placeholder="例如: 業務部" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} />
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <textarea className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-pink-500 focus:outline-none transition-colors" rows="3" placeholder="貼上名單，一行一個名字..." value={newNameList} onChange={e => setNewNameList(e.target.value)}></textarea>
+                                                <button onClick={handleAddNames} className="bg-gray-900 text-white px-6 rounded-xl font-bold hover:bg-black whitespace-nowrap shadow-lg">新增</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Gift size={18}/> 新增獎項</h3>
+                                        <div className="flex gap-3 items-center">
+                                            <input type="text" placeholder="獎品名稱" className="border-2 border-gray-200 p-3 rounded-xl flex-1 focus:border-pink-500 focus:outline-none font-bold text-gray-700" value={newPrizeName} onChange={e => setNewPrizeName(e.target.value)} />
+                                            <input type="number" placeholder="數量" className="border-2 border-gray-200 p-3 rounded-xl w-24 focus:border-pink-500 focus:outline-none font-bold text-center" min="1" value={newPrizeCount} onChange={e => setNewPrizeCount(e.target.value)} />
+                                            <button onClick={addPrize} className="bg-yellow-400 text-yellow-900 px-6 py-3 rounded-xl font-black hover:bg-yellow-500 whitespace-nowrap shadow-md uppercase tracking-wide">Add</button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between items-end mb-4">
+                                            <div>
+                                                <h3 className="font-bold text-gray-900">名單管理</h3>
+                                                <span className="text-xs font-bold bg-gray-200 px-2 py-1 rounded text-gray-600">{currentScene.participants.length} 人</span>
+                                            </div>
+                                            <button onClick={toggleAllGroups} className="text-xs font-bold text-pink-500 hover:text-pink-600 underline">{visibleGroups.size === Object.keys(groupedParticipants).length ? '全部收起' : '全部顯示'}</button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 mb-6 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
+                                            {Object.keys(groupedParticipants).length === 0 && <div className="text-gray-400 text-sm">暫無群組</div>}
+                                            {Object.keys(groupedParticipants).map(groupName => (
+                                                <button key={groupName} onClick={() => toggleGroupVisibility(groupName)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${visibleGroups.has(groupName) ? 'bg-pink-500 text-white border-pink-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-gray-300 hover:border-pink-300'}`}>
+                                                    {visibleGroups.has(groupName) ? <CheckCircle size={12} className="text-white"/> : <div className="w-3 h-3 rounded-full border border-gray-400"></div>}
+                                                    {groupName}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-6">
+                                            {Object.entries(groupedParticipants)
+                                                .filter(([groupName]) => visibleGroups.has(groupName))
+                                                .map(([groupName, participants]) => (
+                                                <div key={groupName} className={`bg-white rounded-xl border-2 overflow-hidden transition-all animate-pop ${dragOverGroup === groupName ? 'drag-over' : 'border-gray-100'}`} onDragOver={(e) => handleDragOver(e, groupName)} onDrop={(e) => handleDrop(e, groupName)}>
+                                                    <div className="bg-gray-50 px-4 py-2 font-black text-gray-700 flex items-center gap-2 border-b-2 border-gray-100">
+                                                        <Building size={16} className="text-pink-500"/>
+                                                        {groupName}
+                                                        <span className="text-xs font-normal text-gray-400 ml-auto">{participants.length} 人</span>
+                                                    </div>
+                                                    <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                        {participants.map(p => (
+                                                            <div key={p.id} draggable="true" onDragStart={(e) => handleDragStart(e, p.id)} onDragEnd={(e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); }} className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all relative group cursor-move ${p.won ? 'bg-gray-100 border-gray-100 opacity-50' : 'bg-white border-gray-100 hover:border-pink-200 hover:shadow-sm'}`}>
+                                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                    <input type="checkbox" checked={p.active} disabled={p.won} onChange={() => toggleParticipantActive(p.id)} className="w-4 h-4 accent-pink-600 rounded shrink-0 cursor-pointer" onClick={(e) => e.stopPropagation()} />
+                                                                    <span className={`font-bold truncate text-sm ${!p.active ? 'line-through text-gray-400' : 'text-gray-700'}`}>{p.name}</span>
+                                                                </div>
+                                                                {!p.won && (
+                                                                    <button onClick={(e) => { e.stopPropagation(); deleteParticipant(p.id); }} className="text-gray-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors shrink-0" title="移除此人">
+                                                                        <X size={14} strokeWidth={3}/>
+                                                                    </button>
+                                                                )}
+                                                                {p.won && <span className="text-[10px] font-black bg-gray-600 text-white px-1 py-0.5 rounded shrink-0">WIN</span>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {currentScene.participants.length > 0 && visibleGroups.size === 0 && (
+                                                <div className="text-center py-8 text-gray-400 font-bold border-2 border-dashed border-gray-200 rounded-xl">請勾選上方群組以檢視名單</div>
+                                            )}
+                                            {currentScene.participants.length === 0 && <div className="text-center text-gray-400 py-4">目前沒有名單</div>}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+                                    <button onClick={() => { setShowSettings(false); setShowRedrawMenu(true); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-pink-200 text-pink-600 rounded-xl hover:bg-pink-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
+                                    <button onClick={() => setShowSettings(false)} className="px-8 py-3 bg-gray-900 text-white rounded-xl hover:bg-black font-bold shadow-lg">完成設定</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Redraw Selection Menu */}
+                    {showRedrawMenu && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleRedrawCancel}>
+                            <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center relative shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-2xl font-black text-gray-800 mb-2 flex items-center justify-center gap-2"><RefreshCw className="text-pink-500"/> 選擇重抽範圍</h3>
+                                <div className="flex justify-end mb-2">
+                                     <button onClick={selectAllRedrawGroups} className="text-sm font-bold text-pink-500 hover:underline">{redrawSelectedGroups.size === Object.keys(groupedParticipants).length ? '取消全選' : '全選'}</button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto overflow-x-hidden p-1 mb-6">
+                                    {Object.keys(groupedParticipants).map(groupName => (
+                                        <button key={groupName} onClick={() => toggleRedrawGroup(groupName)} className={`py-3 rounded-lg border-2 font-bold transition flex items-center justify-center gap-2 ${redrawSelectedGroups.has(groupName) ? 'bg-pink-500 text-white border-pink-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-pink-100 hover:border-pink-300'}`}>
+                                            {redrawSelectedGroups.has(groupName) && <CheckCircle size={16} />}
+                                            {groupName}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => executeRedraw(redrawSelectedGroups)} className="flex-1 bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-xl font-bold hover:brightness-110 shadow-lg transition">開始重抽</button>
+                                    <button onClick={handleRedrawCancel} className="flex-1 bg-gray-200 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-300 transition">取消</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Small Redraw Modal */}
+                    {showRedrawModal && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => {}}>
+                            <div className="bg-white rounded-[40px] p-12 max-w-lg w-full text-center relative shadow-[0_0_80px_rgba(236,72,153,0.6)] animate-pop rainbow-border" onClick={e => e.stopPropagation()}>
+                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-5 border-[4px] border-white shadow-xl">
+                                    <RefreshCw size={40} className="text-white animate-spin-slow" />
+                                </div>
+                                <div className="mt-10 mb-4 text-pink-500 font-bold uppercase tracking-wider text-base">重抽進行中...</div>
+                                {isRedrawSpinning ? (
+                                    <div className="py-10">
+                                        <div className="text-6xl font-black text-gray-900 animate-pulse truncate">{redrawDisplay?.name}</div>
+                                        <div className="text-xl text-gray-400 font-bold mt-2">{redrawDisplay?.group}</div>
+                                    </div>
+                                ) : (
+                                    <div className="py-8 animate-pop">
+                                        <div className="text-7xl font-black gold-text-impact mb-4">{redrawDisplay?.name}</div>
+                                        <div className="text-2xl font-bold text-gray-400 mb-8">{redrawDisplay?.group}</div>
+                                        <button onClick={confirmWin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-2xl font-black text-xl hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><CheckCircle size={24}/> 確認收下</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Main Winner Modal */}
+                    {showWinnerModal && lastWinner && !showRedrawModal && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => {}}>
+                            <div className="bg-white rounded-[40px] p-10 max-w-lg w-full text-center relative shadow-[0_0_100px_rgba(250,204,21,0.5)] animate-pop rainbow-border" onClick={e => e.stopPropagation()}>
+                                <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full p-6 border-[6px] border-white shadow-xl">
+                                    <Trophy size={64} className="text-white" strokeWidth={3} />
+                                </div>
+                                <h2 className="text-3xl font-black text-gray-400 mt-12 mb-4 uppercase tracking-widest">Winner!</h2>
+                                <div className="text-7xl font-black gold-text-impact mb-2 break-words leading-tight">{lastWinner?.person?.name}</div>
+                                <div className="text-xl font-bold text-gray-400 mb-8 tracking-widest">{lastWinner?.person?.group || '一般'}</div>
+                                <div className="bg-pink-50 rounded-2xl p-6 mb-8 border-2 border-pink-100">
+                                    <div className="text-xs text-pink-500 font-black uppercase tracking-widest mb-2">Prize Won</div>
+                                    <div className="text-3xl font-black text-gray-800">{lastWinner.prize.name}</div>
+                                </div>
+                                <div className="flex gap-4">
+                                    <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-2xl font-black text-xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"><CheckCircle size={24}/> 開心收下 🎉</button>
+                                    <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-4 rounded-2xl font-black text-xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw size={24}/> 再抽一次 🔄</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
-        }
+        };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
