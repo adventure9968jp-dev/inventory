@@ -137,7 +137,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
         // --- Sound Manager (Web Audio API) ---
         const SoundManager = {
@@ -151,23 +151,26 @@
                 }
             },
             playTone: function(freq, type, duration, startTime = 0, vol = 0.1) {
-                if (!this.ctx) this.init();
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = type;
-                osc.frequency.value = freq;
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(this.ctx.currentTime + startTime);
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime + startTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
-                osc.stop(this.ctx.currentTime + startTime + duration);
+                try {
+                    if (!this.ctx) this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.value = freq;
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + startTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime + startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
+                    osc.stop(this.ctx.currentTime + startTime + duration);
+                } catch(e) {
+                    // console.error("Audio error", e);
+                }
             },
             spin: function() {
                 this.playTone(800, 'square', 0.05, 0, 0.05);
             },
             win: function() {
-                const now = 0;
                 [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
                     this.playTone(freq, 'triangle', 0.3, i * 0.1, 0.15);
                 });
@@ -204,18 +207,18 @@
         const Coins = (props) => (<Icon {...props}><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m7.1 13.84.3-1.8" /></Icon>);
         const Pencil = (props) => (<Icon {...props}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></Icon>);
 
-        // 預設資料 - 新增 isBonus 欄位
+        // 預設資料
         const DEFAULT_SCENES = [
             {
                 id: 'scene-1',
                 title: '部門聚餐',
                 participants: [
-                    { id: 1, name: '小明', group: '業務部', active: true, won: false },
-                    { id: 2, name: '小華', group: '業務部', active: true, won: false },
-                    { id: 3, name: '美美', group: '行銷部', active: true, won: false },
-                    { id: 4, name: '大壯', group: '工程部', active: true, won: false },
-                    { id: 5, name: '阿強', group: '工程部', active: true, won: false },
-                    { id: 6, name: '老闆', group: '管理層', active: false, won: false },
+                    { id: 1, name: '小明', group: '業務部', active: true, won: false, bonusWon: false },
+                    { id: 2, name: '小華', group: '業務部', active: true, won: false, bonusWon: false },
+                    { id: 3, name: '美美', group: '行銷部', active: true, won: false, bonusWon: false },
+                    { id: 4, name: '大壯', group: '工程部', active: true, won: false, bonusWon: false },
+                    { id: 5, name: '阿強', group: '工程部', active: true, won: false, bonusWon: false },
+                    { id: 6, name: '老闆', group: '管理層', active: false, won: false, bonusWon: false },
                 ],
                 prizes: [
                     { id: 1, name: '現金 $1000', count: 3, value: 1000, isBonus: false },
@@ -228,9 +231,9 @@
                 id: 'scene-2',
                 title: '年終尾牙',
                 participants: [
-                    { id: 1, name: '工程師A', group: '研發處', active: true, won: false },
-                    { id: 2, name: '設計師B', group: '設計處', active: true, won: false },
-                    { id: 3, name: 'PM C', group: '產品處', active: true, won: false },
+                    { id: 1, name: '工程師A', group: '研發處', active: true, won: false, bonusWon: false },
+                    { id: 2, name: '設計師B', group: '設計處', active: true, won: false, bonusWon: false },
+                    { id: 3, name: 'PM C', group: '產品處', active: true, won: false, bonusWon: false },
                 ],
                 prizes: [
                     { id: 1, name: 'iPhone 15', count: 1, value: 29900, isBonus: false },
@@ -323,7 +326,6 @@
             const [adminTargetPrizeId, setAdminTargetPrizeId] = useState(null);
             const [editingPrize, setEditingPrize] = useState(null);
             
-            // New States for Bonus Prize
             const [showBonusModal, setShowBonusModal] = useState(false);
             const [bonusName, setBonusName] = useState('加碼紅包');
             const [bonusAmount, setBonusAmount] = useState(1000);
@@ -411,7 +413,7 @@
                                 ...s,
                                 weights: s.weights || {}
                             }));
-                            setScenes(safeScenes); // History handled by wrapper
+                            setScenes(safeScenes);
                             if (!safeScenes.find(s => s.id === activeSceneId)) {
                                 setActiveSceneId(safeScenes[0]?.id || 'scene-1');
                             }
@@ -470,7 +472,8 @@
                                     name: name,
                                     group: group,
                                     active: true,
-                                    won: false
+                                    won: false,
+                                    bonusWon: false
                                 });
                                 newGroups.add(group);
                             }
@@ -502,21 +505,47 @@
                 }
                 try {
                     const wb = XLSX.utils.book_new();
+
+                    // 1. 總表 (Overview)
                     const allWinnersData = [["獎項名稱", "得獎者", "部門", "中獎時間", "價值"]];
-                    currentScene.history.forEach(h => {
-                        allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time, h.prizeValue || 0]);
+                    let grandTotal = 0;
+                    
+                    const sortedHistory = [...currentScene.history].reverse();
+
+                    sortedHistory.forEach(h => {
+                        const val = parseInt(h.prizeValue) || 0;
+                        grandTotal += val;
+                        allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time, val]);
                     });
+                    
+                    allWinnersData.push([]); 
+                    allWinnersData.push(["", "", "", "總計金額", grandTotal]);
+
                     const wsAll = XLSX.utils.aoa_to_sheet(allWinnersData);
+                    wsAll['!cols'] = [{wch: 20}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 15}];
                     XLSX.utils.book_append_sheet(wb, wsAll, "總覽");
                     
+                    // 2. 各獎項分頁 (Individual Sheets)
                     const prizesInHistory = [...new Set(currentScene.history.map(h => h.prizeName))];
+                    
                     prizesInHistory.forEach(prizeName => {
                         const winners = currentScene.history.filter(h => h.prizeName === prizeName);
-                        const sheetData = [["得獎者", "部門", "中獎時間", "價值"]];
-                        winners.forEach(w => {
-                            sheetData.push([w.personName, w.personGroup || '', w.time, w.prizeValue || 0]);
+                        // Updated Columns with more details for signing
+                        const sheetData = [["項次", "姓名", "中獎金額", "領獎簽收", "非榮實人員身分證字號", "非榮實人員戶籍地址"]];
+                        let prizeTotal = 0;
+
+                        winners.forEach((w, index) => {
+                            const val = parseInt(w.prizeValue) || 0;
+                            prizeTotal += val;
+                            sheetData.push([index + 1, w.personName, val, "", "", ""]);
                         });
+
+                        sheetData.push([]);
+                        sheetData.push(["", "本頁總計", prizeTotal, "", "", ""]);
+
                         const ws = XLSX.utils.aoa_to_sheet(sheetData);
+                        ws['!cols'] = [{wch: 8}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 25}, {wch: 40}];
+
                         const safeName = prizeName.replace(/[\\/?*\[\]]/g, '').substring(0, 30);
                         let sheetName = safeName;
                         let counter = 1;
@@ -526,6 +555,7 @@
                         }
                         XLSX.utils.book_append_sheet(wb, ws, sheetName);
                     });
+
                     XLSX.writeFile(wb, `${currentScene.title}_中獎名單.xlsx`);
                 } catch (error) {
                     console.error("Export Error:", error);
@@ -534,9 +564,8 @@
             };
 
             const triggerConfetti = () => {
-                // Initialize sound on first user interaction if possible
                 SoundManager.init();
-                SoundManager.win(); // Play win sound
+                SoundManager.win();
                 
                 var duration = 3000;
                 var animationEnd = Date.now() + duration;
@@ -568,31 +597,18 @@
                 return weightedCandidates[weightedCandidates.length - 1];
             };
 
-            const startDraw = () => {
-                // Determine candidates based on prize type (Bonus vs Normal)
-                let candidates = [];
-                if (currentPrize.isBonus) {
-                    // Bonus Logic: All active participants, ignoring 'won' status (Everyone eligible again)
-                    // But still respecting 'visibleGroups' (Department filter) if we want to honor the view?
-                    // Usually Bonus is for everyone present. Let's respect visibleGroups to allow filtering if needed.
-                    candidates = currentScene.participants.filter(p => 
-                        p.active && 
-                        visibleGroups.has(p.group || '未分類')
-                    );
-                } else {
-                    // Normal Logic: Not won yet
-                    candidates = currentScene.participants.filter(p => 
-                        p.active && 
-                        !p.won && 
-                        visibleGroups.has(p.group || '未分類')
-                    );
-                }
+            const startDraw = useCallback(() => {
+                const candidates = currentScene.participants.filter(p => 
+                    p.active && 
+                    (currentPrize.isBonus ? !p.bonusWon : !p.won) && 
+                    visibleGroups.has(p.group || '未分類')
+                );
                 
                 if (!currentPrize) { alert("😱 目前沒有獎項！"); return; }
                 if (currentPrize.count <= 0) { alert("😱 這個獎項已經抽完了！請選擇其他獎項。"); return; }
                 if (candidates.length === 0) { alert("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
 
-                SoundManager.init(); // Ensure audio context is ready
+                SoundManager.init();
                 setIsSpinning(true);
                 setShowWinnerModal(false);
                 let counter = 0;
@@ -601,7 +617,7 @@
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
                     setDisplayParticipant(candidates[randomIdx]);
-                    SoundManager.spin(); // Play click sound
+                    SoundManager.spin();
                     counter++;
                 }, speed);
 
@@ -619,24 +635,24 @@
                     triggerConfetti();
                     setShowWinnerModal(true);
                 }, 2500); 
-            };
+            }, [currentScene, currentPrize, visibleGroups]);
 
             const confirmWin = () => {
                 if (!lastWinner?.person) return;
-                SoundManager.confirm(); // Play confirm sound
+                SoundManager.confirm();
                 
                 const { person: winner, prize } = lastWinner;
                 
                 setScenes(prev => prev.map(scene => {
                     if (scene.id !== activeSceneId) return scene;
                     
-                    // Logic: If Bonus Prize, DO NOT mark as won (keep them in pool for normal prizes)
-                    // If Normal Prize, mark as won.
                     const updatedParticipants = scene.participants.map(p => {
                         if (p.id === winner.id) {
-                            // If bonus, return p as is (active, won status unchanged)
-                            // Unless we want to track 'bonus wins' separately, but keeping 'won' false keeps them in normal pool.
-                            return prize.isBonus ? p : { ...p, won: true };
+                            if (prize.isBonus) {
+                                return { ...p, bonusWon: true };
+                            } else {
+                                return { ...p, won: true };
+                            }
                         }
                         return p;
                     });
@@ -648,7 +664,7 @@
                         time: new Date().toLocaleTimeString('en-US', {hour12: false, hour: "numeric", minute: "numeric", second: "numeric"}),
                         personName: winner.name, 
                         personGroup: winner.group, 
-                        prizeName: prize.name, // + (prize.isBonus ? " (加碼)" : ""), // Optional text
+                        prizeName: prize.name,
                         prizeId: prize.id, 
                         prizeValue: prize.value || 0
                     }, ...scene.history];
@@ -658,11 +674,11 @@
                 setShowRedrawModal(false); 
             };
 
-            const handleRedrawClick = () => { 
+            const handleRedrawClick = useCallback(() => { 
                 setShowWinnerModal(false); 
                 setRedrawSelectedGroups(new Set());
                 setShowRedrawMenu(true); 
-            };
+            }, []);
 
             const handleRedrawCancel = () => {
                 setShowRedrawMenu(false);
@@ -690,7 +706,7 @@
                 }
             };
 
-            const executeRedraw = (targetGroups) => {
+            const executeRedraw = useCallback((targetGroups) => {
                 if (!currentPrize || currentPrize.count <= 0) { alert("😱 這個獎項已經發完了！無法重抽。"); return; }
                 
                 if (targetGroups.size === 0) {
@@ -703,16 +719,15 @@
                 let candidates;
                 const isBonusDraw = currentPrize.isBonus;
                 
-                // Helper filter condition
                 const filterFn = (p) => {
                     const groupMatch = targetGroups === 'ALL' 
                         ? visibleGroups.has(p.group || '未分類') 
                         : targetGroups.has(p.group || '未分類');
                     
                     if (isBonusDraw) {
-                        return p.active && groupMatch; // Bonus: Active only
+                        return p.active && !p.bonusWon && groupMatch;
                     } else {
-                        return p.active && !p.won && groupMatch; // Normal: Active & Not Won
+                        return p.active && !p.won && groupMatch;
                     }
                 };
 
@@ -750,12 +765,12 @@
                     setRedrawDisplay(winner); 
                     triggerConfetti();
                 }, 2500);
-            };
+            }, [currentScene, currentPrize, visibleGroups]);
             
-            const reopenRedrawMenu = () => {
+            const reopenRedrawMenu = useCallback(() => {
                 setShowRedrawModal(false); 
                 setShowRedrawMenu(true);   
-            };
+            }, []);
 
             const toggleParticipantActive = (pId) => {
                 setScenes(prev => prev.map(scene => {
@@ -777,7 +792,7 @@
                 const groupToUse = newGroupName.trim() || '一般';
                 setScenes(prev => prev.map(scene => {
                     if (scene.id !== activeSceneId) return scene;
-                    const newParticipants = names.map(name => ({ id: Date.now() + Math.random(), name: name.trim(), group: groupToUse, active: true, won: false }));
+                    const newParticipants = names.map(name => ({ id: Date.now() + Math.random(), name: name.trim(), group: groupToUse, active: true, won: false, bonusWon: false }));
                     return { ...scene, participants: [...scene.participants, ...newParticipants] };
                 }));
                 setVisibleGroups(prev => new Set(prev).add(groupToUse));
@@ -897,7 +912,6 @@
             const handleAddBonus = () => {
                 setScenes(prev => prev.map(scene => {
                     if (scene.id !== activeSceneId) return scene;
-                    // Add bonus prize with isBonus: true
                     return { 
                         ...scene, 
                         prizes: [...scene.prizes, { 
@@ -905,7 +919,7 @@
                             name: bonusName, 
                             count: parseInt(bonusCount), 
                             value: parseInt(bonusAmount) || 0,
-                            isBonus: true // Mark as bonus
+                            isBonus: true 
                         }] 
                     };
                 }));
@@ -914,6 +928,77 @@
                 setBonusAmount(1000);
                 setBonusCount(1);
             };
+
+            // Keyboard Event Listener
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    // PageUp Logic
+                    if (e.code === 'PageUp') {
+                        e.preventDefault();
+
+                        // 1. Main Screen -> Start Draw
+                        if (!isSpinning && !showWinnerModal && !showRedrawModal && !showRedrawMenu && !showSettings && !showAdminLogin && !showAdminPanel && !showBonusModal) {
+                            startDraw();
+                            return;
+                        }
+
+                        // 2. Winner Modal -> Confirm Win (開心收下)
+                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) {
+                            confirmWin();
+                            return;
+                        }
+
+                        // 3. Redraw Menu -> Start Redraw (開始重抽)
+                        if (showRedrawMenu) {
+                             executeRedraw(redrawSelectedGroups);
+                             return;
+                        }
+
+                        // 4. Redraw Modal -> Confirm Win (確認收下)
+                        if (showRedrawModal && !isRedrawSpinning) {
+                            confirmWin();
+                            return;
+                        }
+                    }
+
+                    // PageDown Logic
+                    if (e.code === 'PageDown') {
+                        e.preventDefault();
+
+                        // 1. Winner Modal -> Redraw (再抽一次)
+                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) {
+                            handleRedrawClick();
+                            return;
+                        }
+
+                        // 2. Redraw Modal -> Try Again (再試一次)
+                        if (showRedrawModal && !isRedrawSpinning) {
+                             reopenRedrawMenu();
+                             return;
+                        }
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [
+                isSpinning,
+                showWinnerModal,
+                showRedrawModal,
+                showRedrawMenu,
+                showSettings,
+                showAdminLogin,
+                showAdminPanel,
+                showBonusModal,
+                isRedrawSpinning,
+                redrawSelectedGroups,
+                lastWinner,
+                startDraw,
+                confirmWin,
+                handleRedrawClick,
+                executeRedraw, 
+                reopenRedrawMenu
+            ]);
 
             return (
                 <div className="h-screen flex flex-col p-2 md:p-6 max-w-[1600px] mx-auto w-full">
@@ -939,9 +1024,10 @@
 
                             <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯入設定"><Upload size={18} /><span className="hidden sm:inline">匯入</span></button>
                             <button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯出設定"><Download size={18} /><span className="hidden sm:inline">匯出</span></button>
+                            
                             <button onClick={() => { setShowAdminLogin(true); setLoginError(false); }} className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-black hover:scale-105 transition-all font-bold border border-gray-900" title="管理員登入"><Shield size={18} /></button>
                             
-                            {/* Bonus Button Moved Here */}
+                            {/* Bonus Button Moved Here (Left of Settings) */}
                             <button 
                                 onClick={() => setShowBonusModal(true)}
                                 className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-orange-600 hover:scale-105 transition-all font-bold border border-orange-600"
@@ -1054,15 +1140,15 @@
                         </div>
                     </main>
 
-                    {/* Modals */}
-
+                    {/* Modals... (Same as before) */}
+                    {/* Bonus, Edit, Admin Login, Admin Panel, Settings, Redraw Menu, Small Redraw Modal, Main Winner Modal */}
+                    
                     {/* Bonus Prize Modal */}
                     {showBonusModal && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowBonusModal(false)}>
                             <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-pop border-2 border-orange-200" onClick={e => e.stopPropagation()}>
                                 <h3 className="font-black text-xl text-orange-600 mb-2 flex items-center gap-2"><Coins size={20}/> 臨時加碼設定</h3>
                                 <p className="text-sm text-gray-500 mb-4">注意：加碼獎項將允許所有在職人員重複中獎 (全體復活)。</p>
-                                
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 mb-1">獎項名稱</label>
@@ -1096,7 +1182,6 @@
                                         </div>
                                     </div>
                                 </div>
-
                                 <div className="flex gap-3 mt-6">
                                     <button onClick={() => setShowBonusModal(false)} className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition flex-1">取消</button>
                                     <button onClick={handleAddBonus} className="bg-orange-500 text-white px-6 py-2 rounded-lg font-bold hover:bg-orange-600 transition shadow-md flex-1">確認加碼</button>
@@ -1110,41 +1195,22 @@
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeEditPrize}>
                             <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-pop border-2 border-red-200" onClick={e => e.stopPropagation()}>
                                 <h3 className="font-black text-xl text-gray-800 mb-4 flex items-center gap-2"><Pencil size={20}/> 修改獎項</h3>
-                                
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 mb-1">獎項名稱</label>
-                                        <input 
-                                            type="text" 
-                                            className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none"
-                                            value={editingPrize.name}
-                                            onChange={e => setEditingPrize({...editingPrize, name: e.target.value})}
-                                        />
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none" value={editingPrize.name} onChange={e => setEditingPrize({...editingPrize, name: e.target.value})} />
                                     </div>
                                     <div className="flex gap-4">
                                         <div className="flex-1">
                                             <label className="block text-xs font-bold text-gray-500 mb-1">金額</label>
-                                            <input 
-                                                type="number" 
-                                                className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none"
-                                                min="0"
-                                                value={editingPrize.value}
-                                                onChange={e => setEditingPrize({...editingPrize, value: e.target.value})}
-                                            />
+                                            <input type="number" className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none" min="0" value={editingPrize.value} onChange={e => setEditingPrize({...editingPrize, value: e.target.value})} />
                                         </div>
                                         <div className="flex-1">
                                             <label className="block text-xs font-bold text-gray-500 mb-1">數量</label>
-                                            <input 
-                                                type="number" 
-                                                className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none"
-                                                min="0"
-                                                value={editingPrize.count}
-                                                onChange={e => setEditingPrize({...editingPrize, count: e.target.value})}
-                                            />
+                                            <input type="number" className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none" min="0" value={editingPrize.count} onChange={e => setEditingPrize({...editingPrize, count: e.target.value})} />
                                         </div>
                                     </div>
                                 </div>
-
                                 <div className="flex gap-3 mt-6">
                                     <button onClick={handleDeletePrize} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 transition">刪除</button>
                                     <div className="flex-1"></div>
