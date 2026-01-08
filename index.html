@@ -139,10 +139,51 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
+        // --- Sound Manager (Web Audio API) ---
+        const SoundManager = {
+            ctx: null,
+            init: function() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone: function(freq, type, duration, startTime = 0, vol = 0.1) {
+                if (!this.ctx) this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.value = freq;
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(this.ctx.currentTime + startTime);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime + startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
+                osc.stop(this.ctx.currentTime + startTime + duration);
+            },
+            spin: function() {
+                this.playTone(800, 'square', 0.05, 0, 0.05);
+            },
+            win: function() {
+                const now = 0;
+                [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
+                    this.playTone(freq, 'triangle', 0.3, i * 0.1, 0.15);
+                });
+                this.playTone(523.25, 'triangle', 1.0, 0.4, 0.2);
+                this.playTone(1046.50, 'sine', 1.0, 0.4, 0.1);
+            },
+            confirm: function() {
+                this.playTone(1200, 'sine', 0.6, 0, 0.2);
+            }
+        };
+
         // --- Icon Components ---
         const Icon = ({ children, className, size = 24, ...props }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
         );
+        const Clover = (props) => (<Icon {...props}><path d="M16.2 7.8 16.7 5.3a2 2 0 0 0-3.5-1.5L12 6.1 10.8 3.8a2 2 0 0 0-3.5 1.5l.5 2.5-2.5-.5a2 2 0 0 0-1.5 3.5l2.3 1.2-2.3 1.2a2 2 0 0 0 1.5 3.5l2.5-.5-.5 2.5a2 2 0 0 0 3.5 1.5l1.2-2.3 1.2 2.3a2 2 0 0 0 3.5-1.5l-.5-2.5 2.5.5a2 2 0 0 0 1.5-3.5l-2.3-1.2 2.3-1.2a2 2 0 0 0-1.5-3.5z" /><path d="M12 18v4" /></Icon>);
         const Plus = (props) => (<Icon {...props}><path d="M5 12h14" /><path d="M12 5v14" /></Icon>);
         const X = (props) => (<Icon {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Icon>);
         const Settings = (props) => (<Icon {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Icon>);
@@ -163,7 +204,7 @@
         const Coins = (props) => (<Icon {...props}><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m7.1 13.84.3-1.8" /></Icon>);
         const Pencil = (props) => (<Icon {...props}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></Icon>);
 
-        // 預設資料
+        // 預設資料 - 新增 isBonus 欄位
         const DEFAULT_SCENES = [
             {
                 id: 'scene-1',
@@ -177,8 +218,8 @@
                     { id: 6, name: '老闆', group: '管理層', active: false, won: false },
                 ],
                 prizes: [
-                    { id: 1, name: '現金 $1000', count: 3, value: 1000 },
-                    { id: 2, name: '特休一日券', count: 1, value: 0 },
+                    { id: 1, name: '現金 $1000', count: 3, value: 1000, isBonus: false },
+                    { id: 2, name: '特休一日券', count: 1, value: 0, isBonus: false },
                 ],
                 history: [],
                 weights: {}
@@ -192,7 +233,7 @@
                     { id: 3, name: 'PM C', group: '產品處', active: true, won: false },
                 ],
                 prizes: [
-                    { id: 1, name: 'iPhone 15', count: 1, value: 29900 },
+                    { id: 1, name: 'iPhone 15', count: 1, value: 29900, isBonus: false },
                 ],
                 history: [],
                 weights: {}
@@ -280,9 +321,13 @@
             const [adminPasswordInput, setAdminPasswordInput] = useState('');
             const [loginError, setLoginError] = useState(false);
             const [adminTargetPrizeId, setAdminTargetPrizeId] = useState(null);
-
-            // Edit Prize State
             const [editingPrize, setEditingPrize] = useState(null);
+            
+            // New States for Bonus Prize
+            const [showBonusModal, setShowBonusModal] = useState(false);
+            const [bonusName, setBonusName] = useState('加碼紅包');
+            const [bonusAmount, setBonusAmount] = useState(1000);
+            const [bonusCount, setBonusCount] = useState(1);
 
             const timerRef = useRef(null);
             const fileInputRef = useRef(null); 
@@ -366,7 +411,7 @@
                                 ...s,
                                 weights: s.weights || {}
                             }));
-                            setScenes(safeScenes);
+                            setScenes(safeScenes); // History handled by wrapper
                             if (!safeScenes.find(s => s.id === activeSceneId)) {
                                 setActiveSceneId(safeScenes[0]?.id || 'scene-1');
                             }
@@ -489,7 +534,11 @@
             };
 
             const triggerConfetti = () => {
-                var duration = 3 * 1000;
+                // Initialize sound on first user interaction if possible
+                SoundManager.init();
+                SoundManager.win(); // Play win sound
+                
+                var duration = 3000;
                 var animationEnd = Date.now() + duration;
                 var defaults = { startVelocity: 40, spread: 360, ticks: 100, zIndex: 9999, scalar: 1.2 };
                 function randomInRange(min, max) { return Math.random() * (max - min) + min; }
@@ -520,16 +569,30 @@
             };
 
             const startDraw = () => {
-                const candidates = currentScene.participants.filter(p => 
-                    p.active && 
-                    !p.won && 
-                    visibleGroups.has(p.group || '未分類')
-                );
+                // Determine candidates based on prize type (Bonus vs Normal)
+                let candidates = [];
+                if (currentPrize.isBonus) {
+                    // Bonus Logic: All active participants, ignoring 'won' status (Everyone eligible again)
+                    // But still respecting 'visibleGroups' (Department filter) if we want to honor the view?
+                    // Usually Bonus is for everyone present. Let's respect visibleGroups to allow filtering if needed.
+                    candidates = currentScene.participants.filter(p => 
+                        p.active && 
+                        visibleGroups.has(p.group || '未分類')
+                    );
+                } else {
+                    // Normal Logic: Not won yet
+                    candidates = currentScene.participants.filter(p => 
+                        p.active && 
+                        !p.won && 
+                        visibleGroups.has(p.group || '未分類')
+                    );
+                }
                 
                 if (!currentPrize) { alert("😱 目前沒有獎項！"); return; }
                 if (currentPrize.count <= 0) { alert("😱 這個獎項已經抽完了！請選擇其他獎項。"); return; }
                 if (candidates.length === 0) { alert("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
 
+                SoundManager.init(); // Ensure audio context is ready
                 setIsSpinning(true);
                 setShowWinnerModal(false);
                 let counter = 0;
@@ -538,6 +601,7 @@
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
                     setDisplayParticipant(candidates[randomIdx]);
+                    SoundManager.spin(); // Play click sound
                     counter++;
                 }, speed);
 
@@ -559,15 +623,34 @@
 
             const confirmWin = () => {
                 if (!lastWinner?.person) return;
+                SoundManager.confirm(); // Play confirm sound
+                
                 const { person: winner, prize } = lastWinner;
-                triggerConfetti();
+                
                 setScenes(prev => prev.map(scene => {
                     if (scene.id !== activeSceneId) return scene;
-                    const updatedParticipants = scene.participants.map(p => p.id === winner.id ? { ...p, won: true } : p);
-                    const updatedPrizes = scene.prizes.map(p => p.id === prize.id ? { ...p, count: p.count - 1 } : p);
+                    
+                    // Logic: If Bonus Prize, DO NOT mark as won (keep them in pool for normal prizes)
+                    // If Normal Prize, mark as won.
+                    const updatedParticipants = scene.participants.map(p => {
+                        if (p.id === winner.id) {
+                            // If bonus, return p as is (active, won status unchanged)
+                            // Unless we want to track 'bonus wins' separately, but keeping 'won' false keeps them in normal pool.
+                            return prize.isBonus ? p : { ...p, won: true };
+                        }
+                        return p;
+                    });
+
+                    const updatedPrizes = scene.prizes.map(p => 
+                        p.id === prize.id ? { ...p, count: p.count - 1 } : p
+                    );
                     const newHistory = [{
                         time: new Date().toLocaleTimeString('en-US', {hour12: false, hour: "numeric", minute: "numeric", second: "numeric"}),
-                        personName: winner.name, personGroup: winner.group, prizeName: prize.name, prizeId: prize.id, prizeValue: prize.value || 0
+                        personName: winner.name, 
+                        personGroup: winner.group, 
+                        prizeName: prize.name, // + (prize.isBonus ? " (加碼)" : ""), // Optional text
+                        prizeId: prize.id, 
+                        prizeValue: prize.value || 0
                     }, ...scene.history];
                     return { ...scene, participants: updatedParticipants, prizes: updatedPrizes, history: newHistory };
                 }));
@@ -618,19 +701,22 @@
                 setCurrentRedrawTarget(targetGroups);
 
                 let candidates;
-                if (targetGroups === 'ALL') {
-                     candidates = currentScene.participants.filter(p => 
-                        p.active && 
-                        !p.won && 
-                        visibleGroups.has(p.group || '未分類')
-                    );
-                } else if (targetGroups instanceof Set) {
-                    candidates = currentScene.participants.filter(p => 
-                        p.active && 
-                        !p.won && 
-                        targetGroups.has(p.group || '未分類')
-                    );
-                } else { return; }
+                const isBonusDraw = currentPrize.isBonus;
+                
+                // Helper filter condition
+                const filterFn = (p) => {
+                    const groupMatch = targetGroups === 'ALL' 
+                        ? visibleGroups.has(p.group || '未分類') 
+                        : targetGroups.has(p.group || '未分類');
+                    
+                    if (isBonusDraw) {
+                        return p.active && groupMatch; // Bonus: Active only
+                    } else {
+                        return p.active && !p.won && groupMatch; // Normal: Active & Not Won
+                    }
+                };
+
+                candidates = currentScene.participants.filter(filterFn);
 
                 if (candidates.length === 0) { 
                     alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); 
@@ -643,6 +729,7 @@
                     return; 
                 }
 
+                SoundManager.init();
                 setShowRedrawMenu(false); 
                 setShowRedrawModal(true); 
                 setIsRedrawSpinning(true);
@@ -653,6 +740,7 @@
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
                     setRedrawDisplay(candidates[randomIdx]);
+                    SoundManager.spin();
                     counter++;
                 }, speed);
 
@@ -707,6 +795,25 @@
                     const newWeights = { ...scene.weights };
                     if (!newWeights[adminTargetPrizeId]) newWeights[adminTargetPrizeId] = {};
                     newWeights[adminTargetPrizeId][participantId] = weight;
+                    return { ...scene, weights: newWeights };
+                }));
+            };
+
+            // 新增: 批量更新群組權重
+            const updateGroupWeights = (groupParticipants, weight) => {
+                if (!adminTargetPrizeId) return;
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    const newWeights = { ...scene.weights };
+                    if (!newWeights[adminTargetPrizeId]) newWeights[adminTargetPrizeId] = {};
+                    
+                    groupParticipants.forEach(p => {
+                        // 只更新未中獎的人
+                        if (!p.won) {
+                            newWeights[adminTargetPrizeId][p.id] = weight;
+                        }
+                    });
+                    
                     return { ...scene, weights: newWeights };
                 }));
             };
@@ -781,10 +888,31 @@
                     return { ...scene, prizes: updatedPrizes };
                 }));
                 closeEditPrize();
-                // Also reset selected prize if it was the deleted one
                 if (selectedPrizeId === editingPrize.id) {
                     setSelectedPrizeId(null);
                 }
+            };
+            
+            // Bonus Prize Handler
+            const handleAddBonus = () => {
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    // Add bonus prize with isBonus: true
+                    return { 
+                        ...scene, 
+                        prizes: [...scene.prizes, { 
+                            id: Date.now(), 
+                            name: bonusName, 
+                            count: parseInt(bonusCount), 
+                            value: parseInt(bonusAmount) || 0,
+                            isBonus: true // Mark as bonus
+                        }] 
+                    };
+                }));
+                setShowBonusModal(false);
+                setBonusName('加碼紅包');
+                setBonusAmount(1000);
+                setBonusCount(1);
             };
 
             return (
@@ -812,6 +940,16 @@
                             <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯入設定"><Upload size={18} /><span className="hidden sm:inline">匯入</span></button>
                             <button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯出設定"><Download size={18} /><span className="hidden sm:inline">匯出</span></button>
                             <button onClick={() => { setShowAdminLogin(true); setLoginError(false); }} className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-black hover:scale-105 transition-all font-bold border border-gray-900" title="管理員登入"><Shield size={18} /></button>
+                            
+                            {/* Bonus Button Moved Here */}
+                            <button 
+                                onClick={() => setShowBonusModal(true)}
+                                className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-orange-600 hover:scale-105 transition-all font-bold border border-orange-600"
+                                title="臨時加碼 (全體復活)"
+                            >
+                                <Coins size={18} /> 加碼
+                            </button>
+
                             <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-red-700 hover:scale-105 transition-all font-bold ring-2 ring-red-200"><Settings size={20} /><span>設定</span></button>
                         </div>
                     </div>
@@ -865,18 +1003,12 @@
                                                 <div className="flex flex-col">
                                                     <span className={`font-black text-lg ${prize.count === 0 ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{prize.name}</span>
                                                     {isActivePrize && prize.count > 0 && <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Current Target</span>}
+                                                    {/* Bonus Label */}
+                                                    {prize.isBonus && <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mt-0.5">加碼 (Bonus)</span>}
                                                 </div>
-                                                
                                                 <div className="flex items-center gap-2">
                                                     <div className={`w-10 h-8 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
-                                                    {/* Edit Button */}
-                                                    <button 
-                                                        onClick={(e) => { e.stopPropagation(); openEditPrize(prize); }}
-                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="修改獎項"
-                                                    >
-                                                        <Pencil size={16} />
-                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); openEditPrize(prize); }} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="修改獎項"><Pencil size={16} /></button>
                                                 </div>
                                             </div>
                                         );
@@ -888,7 +1020,7 @@
                             <div className="flex-1 min-h-0 bg-red-50 rounded-3xl p-1 border-2 border-red-200 flex flex-col">
                                 <div className="bg-red-100 p-4 rounded-t-[20px] flex-none border-b-2 border-red-200 flex justify-between items-center">
                                     <h3 className="font-black text-xl text-gray-600 flex items-center gap-2"><Users size={24} className="text-gray-500"/> {currentPrize ? `${currentPrize.name} 得主` : '中獎紀錄'}</h3>
-                                    <button onClick={handleExportWinnersXlsx} className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-100 hover:bg-green-200 px-3 py-1.5 rounded-lg transition" title="匯出中獎名單為 Excel (.xlsx)"><FileSpreadsheet size={16}/> 匯出得獎名單</button>
+                                    <button onClick={handleExportWinnersXlsx} className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-100 hover:bg-green-200 px-3 py-1.5 rounded-lg transition" title="匯出"><FileSpreadsheet size={16}/> 匯出得獎名單</button>
                                 </div>
                                 <ul className="flex-1 overflow-y-auto p-4 space-y-2">
                                     {currentScene.history.filter(record => !currentPrize || record.prizeId === currentPrize.id).map((record, idx) => (
@@ -909,8 +1041,6 @@
                                     )}
                                 </ul>
                             </div>
-                            
-                            {/* Summary Card */}
                             <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-red-100 flex justify-between items-center mt-auto flex-none">
                                 <div>
                                     <div className="text-gray-400 text-xs font-bold uppercase flex items-center gap-1"><Coins size={14}/> 總計金額</div>
@@ -925,6 +1055,55 @@
                     </main>
 
                     {/* Modals */}
+
+                    {/* Bonus Prize Modal */}
+                    {showBonusModal && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowBonusModal(false)}>
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-pop border-2 border-orange-200" onClick={e => e.stopPropagation()}>
+                                <h3 className="font-black text-xl text-orange-600 mb-2 flex items-center gap-2"><Coins size={20}/> 臨時加碼設定</h3>
+                                <p className="text-sm text-gray-500 mb-4">注意：加碼獎項將允許所有在職人員重複中獎 (全體復活)。</p>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">獎項名稱</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-orange-500 focus:outline-none"
+                                            value={bonusName}
+                                            onChange={e => setBonusName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-gray-500 mb-1">金額</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-orange-500 focus:outline-none"
+                                                min="0"
+                                                value={bonusAmount}
+                                                onChange={e => setBonusAmount(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-gray-500 mb-1">數量</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-orange-500 focus:outline-none"
+                                                min="1"
+                                                value={bonusCount}
+                                                onChange={e => setBonusCount(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 mt-6">
+                                    <button onClick={() => setShowBonusModal(false)} className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition flex-1">取消</button>
+                                    <button onClick={handleAddBonus} className="bg-orange-500 text-white px-6 py-2 rounded-lg font-bold hover:bg-orange-600 transition shadow-md flex-1">確認加碼</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Edit Prize Modal */}
                     {editingPrize && (
@@ -1008,7 +1187,12 @@
                                 <div className="p-6 overflow-y-auto flex-1 space-y-6">
                                     {Object.entries(groupedParticipants).map(([groupName, participants]) => (
                                         <div key={groupName} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                                            <div className="bg-gray-50 px-4 py-2 font-bold text-gray-700 flex items-center gap-2 border-b"><Building size={16}/> {groupName}</div>
+                                            <div className="bg-gray-50 px-4 py-2 font-bold text-gray-700 flex items-center gap-2 border-b"><Building size={16}/> {groupName}
+                                                <div className="ml-auto flex gap-2">
+                                                    <button onClick={() => updateGroupWeights(participants, 1)} className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded hover:bg-green-200 transition font-bold border border-green-200">全開</button>
+                                                    <button onClick={() => updateGroupWeights(participants, 0)} className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded hover:bg-gray-300 transition font-bold border border-gray-300">全關</button>
+                                                </div>
+                                            </div>
                                             <div className="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                                                 {participants.map(p => {
                                                     const weight = currentScene.weights?.[adminTargetPrizeId]?.[p.id] !== undefined ? currentScene.weights[adminTargetPrizeId][p.id] : 1;
@@ -1044,7 +1228,6 @@
                                     <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-200 rounded-full transition"><X/></button>
                                 </div>
                                 <div className="p-8 overflow-y-auto flex-1 space-y-8">
-                                    {/* Add Participants with Group */}
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
                                             <h3 className="font-bold text-gray-900 flex items-center gap-2"><Plus size={18}/> 快速新增人員</h3>
@@ -1064,61 +1247,29 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Add Prizes */}
                                     <div>
                                         <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Gift size={18}/> 新增獎項</h3>
                                         <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
                                             <div className="flex gap-2 mb-2">
                                                 <div className="flex-1">
                                                     <label className="text-xs text-gray-500 font-bold ml-1">獎項名稱</label>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="例: 頭獎" 
-                                                        className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-gray-700" 
-                                                        value={newPrizeName} 
-                                                        onChange={e => setNewPrizeName(e.target.value)} 
-                                                    />
+                                                    <input type="text" placeholder="例: 頭獎" className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-gray-700" value={newPrizeName} onChange={e => setNewPrizeName(e.target.value)} />
                                                 </div>
                                                 <div className="w-24">
                                                     <label className="text-xs text-gray-500 font-bold ml-1">金額</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="0" 
-                                                        className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-center" 
-                                                        min="0" 
-                                                        value={newPrizeValue} 
-                                                        onChange={e => setNewPrizeValue(e.target.value)} 
-                                                    />
+                                                    <input type="number" placeholder="0" className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-center" min="0" value={newPrizeValue} onChange={e => setNewPrizeValue(e.target.value)} />
                                                 </div>
                                                 <div className="w-20">
                                                     <label className="text-xs text-gray-500 font-bold ml-1">數量</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="1" 
-                                                        className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-center" 
-                                                        min="1" 
-                                                        value={newPrizeCount} 
-                                                        onChange={e => setNewPrizeCount(e.target.value)} 
-                                                    />
+                                                    <input type="number" placeholder="1" className="w-full border-2 border-gray-200 p-2 rounded-lg focus:border-red-500 focus:outline-none font-bold text-center" min="1" value={newPrizeCount} onChange={e => setNewPrizeCount(e.target.value)} />
                                                 </div>
                                             </div>
-                                            
                                             <div className="flex justify-between items-center mt-2">
-                                                <div className="text-gray-400 text-xs font-bold">
-                                                    預估總額: <span className="text-gray-600">${((parseInt(newPrizeValue) || 0) * (parseInt(newPrizeCount) || 0)).toLocaleString()}</span>
-                                                </div>
-                                                <button 
-                                                    onClick={addPrize} 
-                                                    className="bg-yellow-400 text-yellow-900 px-6 py-2 rounded-lg font-black hover:bg-yellow-500 whitespace-nowrap shadow-md uppercase tracking-wide text-sm"
-                                                >
-                                                    新增獎項
-                                                </button>
+                                                <div className="text-gray-400 text-xs font-bold">預估總額: <span className="text-gray-600">${((parseInt(newPrizeValue) || 0) * (parseInt(newPrizeCount) || 0)).toLocaleString()}</span></div>
+                                                <button onClick={addPrize} className="bg-yellow-400 text-yellow-900 px-6 py-2 rounded-lg font-black hover:bg-yellow-500 whitespace-nowrap shadow-md uppercase tracking-wide text-sm">新增獎項</button>
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Manage Participants (Grouped) */}
                                     <div>
                                         <div className="flex justify-between items-end mb-4">
                                             <div>
@@ -1172,7 +1323,7 @@
                                     </div>
                                 </div>
                                 <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-                                    <button onClick={() => { setShowSettings(false); setShowRedrawMenu(true); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
+                                    <button onClick={() => { setShowSettings(false); setShowRedrawMenu(true); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-pink-200 text-red-600 rounded-xl hover:bg-pink-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
                                     <button onClick={() => setShowSettings(false)} className="px-8 py-3 bg-gray-900 text-white rounded-xl hover:bg-black font-bold shadow-lg">完成設定</button>
                                 </div>
                             </div>
