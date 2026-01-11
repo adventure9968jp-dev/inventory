@@ -80,7 +80,7 @@
 
         @keyframes highlight {
             0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.02); }
             100% { transform: scale(1); }
         }
 
@@ -119,8 +119,44 @@
             border-style: dashed !important;
         }
 
+        /* 活躍格子樣式 */
+        .grid-cell-active {
+            background: #FEF08A; /* Yellow-200 */
+            border-color: #EAB308; /* Yellow-500 */
+            transform: scale(1.0);
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.8);
+            z-index: 10;
+        }
+        
+        /* 中獎格子樣式 */
+        .grid-cell-winner {
+            background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+            border-color: #B45309;
+            color: white;
+            /* transform: scale(1.1); 已移除縮放 */
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.9);
+            z-index: 20;
+            animation: highlight 0.5s infinite;
+        }
+
+        /* 一般格子樣式 */
+        .grid-cell-normal {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); /* Red-500 to Red-600 */
+            border-color: #fca5a5; /* Red-300 */
+            color: white;
+        }
+        
+        /* 已中獎者樣式 (黑底白字) */
+        .grid-cell-already-won {
+            background: #1f2937; /* Gray-800 */
+            border-color: #000000;
+            color: white;
+            opacity: 0.8;
+        }
+
         ::-webkit-scrollbar {
-            width: 10px;
+            width: 8px;
+            height: 8px; /* 增加水平捲軸高度設定 */
         }
         ::-webkit-scrollbar-track {
             background: #ffe4e6;
@@ -131,6 +167,10 @@
             border-radius: 5px;
             border: 2px solid #ffe4e6;
         }
+        /* 隱藏捲軸角落的灰色方塊 */
+        ::-webkit-scrollbar-corner {
+            background: transparent;
+        }
     </style>
 </head>
 <body>
@@ -139,46 +179,77 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- Sound Manager (Web Audio API) ---
+        // --- Sound Manager (Implemented with Web Audio API) ---
         const SoundManager = {
             ctx: null,
             init: function() {
                 if (!this.ctx) {
-                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    // Initialize AudioContext
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
                 }
+                // Resume if suspended (browser policy)
                 if (this.ctx.state === 'suspended') {
                     this.ctx.resume();
                 }
             },
-            playTone: function(freq, type, duration, startTime = 0, vol = 0.1) {
-                try {
-                    if (!this.ctx) this.init();
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = type;
-                    osc.frequency.value = freq;
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start(this.ctx.currentTime + startTime);
-                    gain.gain.setValueAtTime(vol, this.ctx.currentTime + startTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
-                    osc.stop(this.ctx.currentTime + startTime + duration);
-                } catch(e) {
-                    // console.error("Audio error", e);
-                }
+            // Helper to play a simple tone
+            playTone: function(freq, type, duration, startTime = 0, volume = 0.1) {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
+                
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime + startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start(this.ctx.currentTime + startTime);
+                osc.stop(this.ctx.currentTime + startTime + duration);
             },
+            // Spin Sound: Short, high-pitched "tick"
             spin: function() {
-                this.playTone(800, 'square', 0.05, 0, 0.05);
+                this.init();
+                if (!this.ctx) return;
+                // Create a short, percussive sound
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'triangle';
+                // Slight random pitch for variation
+                const freq = 800 + Math.random() * 100;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                
+                // Short envelope
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
             },
+            // Win Sound: Fanfare (Major Chord Arpeggio)
             win: function() {
-                [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
-                    this.playTone(freq, 'triangle', 0.3, i * 0.1, 0.15);
-                });
-                this.playTone(523.25, 'triangle', 1.0, 0.4, 0.2);
-                this.playTone(1046.50, 'sine', 1.0, 0.4, 0.1);
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                // C Major Chord: C5, E5, G5, C6
+                this.playTone(523.25, 'sine', 0.4, 0, 0.15);      // C5
+                this.playTone(659.25, 'sine', 0.4, 0.1, 0.15);    // E5
+                this.playTone(783.99, 'sine', 0.4, 0.2, 0.15);    // G5
+                this.playTone(1046.50, 'triangle', 0.8, 0.3, 0.2); // C6 (Stronger)
             },
+            // Confirm Sound: Simple "Ding"
             confirm: function() {
-                this.playTone(1200, 'sine', 0.6, 0, 0.2);
+                this.init();
+                if (!this.ctx) return;
+                this.playTone(880, 'sine', 0.6, 0, 0.1); // A5
             }
         };
 
@@ -296,8 +367,11 @@
 
             const [activeSceneId, setActiveSceneId] = useState('scene-1');
             const [isSpinning, setIsSpinning] = useState(false);
-            const [displayParticipant, setDisplayParticipant] = useState(null);
             
+            // 用於 Grid 顯示的變數
+            const [drawPool, setDrawPool] = useState([]); // 參與當次抽獎的池子 (僅視覺快照)
+            const [highlightId, setHighlightId] = useState(null); // 目前跳到誰
+
             const [showSettings, setShowSettings] = useState(false);
             const [showWinnerModal, setShowWinnerModal] = useState(false);
             const [lastWinner, setLastWinner] = useState(null);
@@ -306,7 +380,10 @@
             const [showRedrawMenu, setShowRedrawMenu] = useState(false);
             const [showRedrawModal, setShowRedrawModal] = useState(false);
             const [isRedrawSpinning, setIsRedrawSpinning] = useState(false);
+            
+            // For Redraw Modal result display (just name string or object)
             const [redrawDisplay, setRedrawDisplay] = useState(null);
+
             const [redrawSelectedGroups, setRedrawSelectedGroups] = useState(new Set());
             const [currentRedrawTarget, setCurrentRedrawTarget] = useState(null);
             
@@ -334,6 +411,10 @@
             const timerRef = useRef(null);
             const fileInputRef = useRef(null); 
             const participantsInputRef = useRef(null); 
+            
+            // NEW REFS
+            const mainGridRef = useRef(null);
+            const redrawGridRef = useRef(null);
 
             const currentScene = scenes.find(s => s.id === activeSceneId) || scenes[0];
 
@@ -343,6 +424,41 @@
                 currentScene.participants.forEach(p => groups.add(p.group || '未分類'));
                 setVisibleGroups(groups);
             }, [activeSceneId, currentScene.participants.length]); 
+
+            // Scroll effect for Grid Animation (Enhanced & Fixed for Jumping)
+            useEffect(() => {
+                if (highlightId) {
+                    // Helper to scroll specific container without moving window
+                    const scrollToCenter = (container, elementId) => {
+                        if (!container) return false;
+                        const element = document.getElementById(elementId);
+                        if (!element) return false;
+                        
+                        const containerRect = container.getBoundingClientRect();
+                        const elementRect = element.getBoundingClientRect();
+                        
+                        // Calculate offset from container top
+                        const relativeTop = elementRect.top - containerRect.top;
+                        
+                        // Target scrollTop = Current scrollTop + relativeTop - (containerHeight/2) + (elementHeight/2)
+                        const targetScroll = container.scrollTop + relativeTop - (container.clientHeight / 2) + (element.clientHeight / 2);
+                        
+                        container.scrollTop = targetScroll;
+                        return true;
+                    };
+
+                    // 1. Try Redraw Modal
+                    if (showRedrawModal && redrawGridRef.current) {
+                        const found = scrollToCenter(redrawGridRef.current, `redraw-cell-${highlightId}`);
+                        if (found) return;
+                    }
+
+                    // 2. Main Grid
+                    if (mainGridRef.current) {
+                        scrollToCenter(mainGridRef.current, `cell-${highlightId}`);
+                    }
+                }
+            }, [highlightId, showRedrawModal]);
 
             const currentPrize = useMemo(() => {
                 if (selectedPrizeId) {
@@ -362,6 +478,17 @@
                 return groups;
             }, [currentScene.participants]);
 
+            // 計算目前獎項的「有效顯示池」(用於顯示 Grid)
+            // 修改：現在不隱藏中獎者，顯示所有符合群組且Active的人
+            const gridCandidates = useMemo(() => {
+                if (isSpinning || showWinnerModal || showRedrawModal) return drawPool;
+                
+                return currentScene.participants.filter(p => 
+                    p.active && 
+                    visibleGroups.has(p.group || '未分類')
+                );
+            }, [currentScene, visibleGroups, isSpinning, showWinnerModal, showRedrawModal, drawPool]);
+
             const totalWonValue = useMemo(() => {
                 return currentScene.history.reduce((acc, curr) => acc + (curr.prizeValue || 0), 0);
             }, [currentScene.history]);
@@ -373,11 +500,8 @@
 
             const toggleGroupVisibility = (groupName) => {
                 const newVisible = new Set(visibleGroups);
-                if (newVisible.has(groupName)) {
-                    newVisible.delete(groupName);
-                } else {
-                    newVisible.add(groupName);
-                }
+                if (newVisible.has(groupName)) newVisible.delete(groupName);
+                else newVisible.add(groupName);
                 setVisibleGroups(newVisible);
             };
 
@@ -409,21 +533,12 @@
                     try {
                         const importedScenes = JSON.parse(e.target.result);
                         if (Array.isArray(importedScenes)) {
-                            const safeScenes = importedScenes.map(s => ({
-                                ...s,
-                                weights: s.weights || {}
-                            }));
+                            const safeScenes = importedScenes.map(s => ({ ...s, weights: s.weights || {} }));
                             setScenes(safeScenes);
-                            if (!safeScenes.find(s => s.id === activeSceneId)) {
-                                setActiveSceneId(safeScenes[0]?.id || 'scene-1');
-                            }
+                            if (!safeScenes.find(s => s.id === activeSceneId)) setActiveSceneId(safeScenes[0]?.id || 'scene-1');
                             alert("✅ 資料匯入成功！");
-                        } else {
-                            alert("❌ 檔案格式錯誤：應為場景陣列。");
-                        }
-                    } catch (error) {
-                        alert("❌ 匯入失敗：無法解析檔案。");
-                    }
+                        } else { alert("❌ 檔案格式錯誤。"); }
+                    } catch (error) { alert("❌ 匯入失敗。"); }
                 };
                 reader.readAsText(fileObj);
                 event.target.value = null;
@@ -431,13 +546,8 @@
 
             const handleExportParticipants = () => {
                 let csvContent = "\uFEFF名稱,部門\n";
-                if (currentScene.participants.length > 0) {
-                    currentScene.participants.forEach(p => {
-                        csvContent += `${p.name},${p.group || '一般'}\n`;
-                    });
-                } else {
-                    csvContent += "範例王小明,業務部\n";
-                }
+                if (currentScene.participants.length > 0) { currentScene.participants.forEach(p => { csvContent += `${p.name},${p.group || '一般'}\n`; }); } 
+                else { csvContent += "範例王小明,業務部\n"; }
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
@@ -451,116 +561,65 @@
             const handleImportParticipants = (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
-
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const text = e.target.result;
                     const lines = text.split(/\r\n|\n/);
                     const newParticipants = [];
                     const newGroups = new Set(visibleGroups);
-
                     for (let i = 1; i < lines.length; i++) {
                         const line = lines[i].trim();
                         if (line) {
                             const parts = line.split(',');
                             const name = parts[0]?.trim();
                             const group = parts[1]?.trim() || '一般';
-                            
                             if (name) {
-                                newParticipants.push({
-                                    id: Date.now() + Math.random() + i,
-                                    name: name,
-                                    group: group,
-                                    active: true,
-                                    won: false,
-                                    bonusWon: false
-                                });
+                                newParticipants.push({ id: Date.now() + Math.random() + i, name: name, group: group, active: true, won: false, bonusWon: false });
                                 newGroups.add(group);
                             }
                         }
                     }
-
                     if (newParticipants.length > 0) {
                         setScenes(prev => prev.map(scene => {
                             if (scene.id !== activeSceneId) return scene;
-                            return {
-                                ...scene,
-                                participants: [...scene.participants, ...newParticipants]
-                            };
+                            return { ...scene, participants: [...scene.participants, ...newParticipants] };
                         }));
                         setVisibleGroups(newGroups);
                         alert(`✅ 成功匯入 ${newParticipants.length} 筆名單！`);
-                    } else {
-                        alert("⚠️ 檔案中似乎沒有有效資料，請檢查格式。");
-                    }
+                    } else { alert("⚠️ 檔案中似乎沒有有效資料，請檢查格式。"); }
                 };
                 reader.readAsText(file);
                 event.target.value = null;
             };
 
             const handleExportWinnersXlsx = () => {
-                if (currentScene.history.length === 0) {
-                    alert("⚠️ 目前還沒有中獎紀錄可以匯出喔！");
-                    return;
-                }
+                if (currentScene.history.length === 0) { alert("⚠️ 目前還沒有中獎紀錄可以匯出喔！"); return; }
                 try {
                     const wb = XLSX.utils.book_new();
-
-                    // 1. 總表 (Overview)
                     const allWinnersData = [["獎項名稱", "得獎者", "部門", "中獎時間", "價值"]];
                     let grandTotal = 0;
-                    
                     const sortedHistory = [...currentScene.history].reverse();
-
-                    sortedHistory.forEach(h => {
-                        const val = parseInt(h.prizeValue) || 0;
-                        grandTotal += val;
-                        allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time, val]);
-                    });
-                    
-                    allWinnersData.push([]); 
-                    allWinnersData.push(["", "", "", "總計金額", grandTotal]);
-
+                    sortedHistory.forEach(h => { const val = parseInt(h.prizeValue) || 0; grandTotal += val; allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time, val]); });
+                    allWinnersData.push([]); allWinnersData.push(["", "", "", "總計金額", grandTotal]);
                     const wsAll = XLSX.utils.aoa_to_sheet(allWinnersData);
                     wsAll['!cols'] = [{wch: 20}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 15}];
                     XLSX.utils.book_append_sheet(wb, wsAll, "總覽");
-                    
-                    // 2. 各獎項分頁 (Individual Sheets)
                     const prizesInHistory = [...new Set(currentScene.history.map(h => h.prizeName))];
-                    
                     prizesInHistory.forEach(prizeName => {
                         const winners = currentScene.history.filter(h => h.prizeName === prizeName);
-                        // Updated Columns with more details for signing
                         const sheetData = [["項次", "姓名", "中獎金額", "領獎簽收", "非榮實人員身分證字號", "非榮實人員戶籍地址"]];
                         let prizeTotal = 0;
-
-                        winners.forEach((w, index) => {
-                            const val = parseInt(w.prizeValue) || 0;
-                            prizeTotal += val;
-                            sheetData.push([index + 1, w.personName, val, "", "", ""]);
-                        });
-
-                        sheetData.push([]);
-                        sheetData.push(["", "本頁總計", prizeTotal, "", "", ""]);
-
+                        winners.forEach((w, index) => { const val = parseInt(w.prizeValue) || 0; prizeTotal += val; sheetData.push([index + 1, w.personName, val, "", "", ""]); });
+                        sheetData.push([]); sheetData.push(["", "本頁總計", prizeTotal, "", "", ""]);
                         const ws = XLSX.utils.aoa_to_sheet(sheetData);
                         ws['!cols'] = [{wch: 8}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 25}, {wch: 40}];
-
                         const safeName = prizeName.replace(/[\\/?*\[\]]/g, '').substring(0, 30);
-                        let sheetName = safeName;
-                        let counter = 1;
-                        while (wb.SheetNames.includes(sheetName)) {
-                            sheetName = `${safeName.substring(0, 28)}_${counter}`;
-                            counter++;
-                        }
+                        let sheetName = safeName; let counter = 1;
+                        while (wb.SheetNames.includes(sheetName)) { sheetName = `${safeName.substring(0, 28)}_${counter}`; counter++; }
                         XLSX.utils.book_append_sheet(wb, ws, sheetName);
                     });
-
                     XLSX.writeFile(wb, `${currentScene.title}_中獎名單.xlsx`);
-                } catch (error) {
-                    console.error("Export Error:", error);
-                    alert("匯出失敗，請確認瀏覽器支援或聯絡管理員。");
-                }
+                } catch (error) { console.error("Export Error:", error); alert("匯出失敗。"); }
             };
 
             const triggerConfetti = () => {
@@ -598,43 +657,57 @@
             };
 
             const startDraw = useCallback(() => {
-                const candidates = currentScene.participants.filter(p => 
-                    p.active && 
-                    (currentPrize.isBonus ? !p.bonusWon : !p.won) && 
-                    visibleGroups.has(p.group || '未分類')
+                // Initialize audio context on user interaction
+                SoundManager.init();
+
+                // 1. Calculate the VIEW pool (everyone visible)
+                const visibleParticipants = currentScene.participants.filter(p => 
+                    p.active && visibleGroups.has(p.group || '未分類')
+                );
+
+                // 2. Calculate the ELIGIBLE candidates (for winning)
+                const eligibleCandidates = visibleParticipants.filter(p => 
+                    currentPrize.isBonus ? !p.bonusWon : !p.won
                 );
                 
                 if (!currentPrize) { alert("😱 目前沒有獎項！"); return; }
                 if (currentPrize.count <= 0) { alert("😱 這個獎項已經抽完了！請選擇其他獎項。"); return; }
-                if (candidates.length === 0) { alert("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
+                if (eligibleCandidates.length === 0) { alert("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
 
-                SoundManager.init();
+                // Lock the grid view to ALL visible (including winners)
+                setDrawPool(visibleParticipants); 
                 setIsSpinning(true);
                 setShowWinnerModal(false);
+                setHighlightId(null);
+                
                 let counter = 0;
-                const speed = 40; 
+                const speed = 50; 
                 
                 timerRef.current = setInterval(() => {
-                    const randomIdx = Math.floor(Math.random() * candidates.length);
-                    setDisplayParticipant(candidates[randomIdx]);
+                    // Randomly highlight ONLY eligible candidates
+                    const randomIdx = Math.floor(Math.random() * eligibleCandidates.length);
+                    setHighlightId(eligibleCandidates[randomIdx].id);
                     SoundManager.spin();
                     counter++;
                 }, speed);
 
                 setTimeout(() => {
                     clearInterval(timerRef.current);
-                    const winner = getWeightedWinner(candidates, currentPrize.id);
+                    const winner = getWeightedWinner(eligibleCandidates, currentPrize.id);
                     if (!winner) {
                         setIsSpinning(false);
                         alert("⚠️ 所有候選人的中獎機率皆為 0，無法抽出得主！");
                         return;
                     }
+                    setHighlightId(winner.id);
                     setIsSpinning(false);
                     setLastWinner({ person: winner, prize: currentPrize });
-                    setDisplayParticipant(winner);
-                    triggerConfetti();
-                    setShowWinnerModal(true);
-                }, 2500); 
+                    
+                    setTimeout(() => {
+                        triggerConfetti();
+                        setShowWinnerModal(true);
+                    }, 800);
+                }, 3000); 
             }, [currentScene, currentPrize, visibleGroups]);
 
             const confirmWin = useCallback(() => {
@@ -672,20 +745,22 @@
                 }));
                 setShowWinnerModal(false);
                 setShowRedrawModal(false); 
+                setHighlightId(null);
             }, [activeSceneId, lastWinner]);
 
+            // ... (Redraw logic) ...
             const handleRedrawClick = useCallback(() => { 
                 setShowWinnerModal(false); 
-                setRedrawSelectedGroups(new Set(Object.keys(groupedParticipants))); // Default Select All
+                setRedrawSelectedGroups(new Set(Object.keys(groupedParticipants))); 
                 setShowRedrawMenu(true); 
             }, [groupedParticipants]);
 
-            const handleRedrawCancel = () => {
+            const handleRedrawCancel = useCallback(() => {
                 setShowRedrawMenu(false);
                 if (lastWinner) {
                     setShowWinnerModal(true);
                 }
-            };
+            }, [lastWinner]);
 
             const toggleRedrawGroup = (groupName) => {
                 const newSet = new Set(redrawSelectedGroups);
@@ -719,52 +794,44 @@
                 let candidates;
                 const isBonusDraw = currentPrize.isBonus;
                 
+                // For redraw, we usually only care about the eligible ones for spinning
+                // But for display, maybe we want to keep consistent?
+                // Let's assume redraw grid only shows eligible people to keep focus
+                
                 const filterFn = (p) => {
-                    const groupMatch = targetGroups === 'ALL' 
-                        ? visibleGroups.has(p.group || '未分類') 
-                        : targetGroups.has(p.group || '未分類');
-                    
-                    if (isBonusDraw) {
-                        return p.active && !p.bonusWon && groupMatch;
-                    } else {
-                        return p.active && !p.won && groupMatch;
-                    }
+                    const groupMatch = targetGroups.has(p.group || '未分類');
+                    if (isBonusDraw) return p.active && !p.bonusWon && groupMatch;
+                    else return p.active && !p.won && groupMatch;
                 };
 
                 candidates = currentScene.participants.filter(filterFn);
-
-                if (candidates.length === 0) { 
-                    alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); 
-                    return; 
-                }
+                if (candidates.length === 0) { alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); return; }
                 
                 const winner = getWeightedWinner(candidates, currentPrize.id);
-                if (!winner) { 
-                    alert("⚠️ 該群組所有候選人的權重皆為 0，無法抽出！"); 
-                    return; 
-                }
+                if (!winner) { alert("⚠️ 該群組所有候選人的權重皆為 0，無法抽出！"); return; }
 
-                SoundManager.init();
+                setDrawPool(candidates); // Update draw pool for the redraw grid (Here we only show eligible for focus)
                 setShowRedrawMenu(false); 
                 setShowRedrawModal(true); 
                 setIsRedrawSpinning(true);
+                setHighlightId(null);
                 setLastWinner({ person: winner, prize: currentPrize });
 
-                let counter = 0; const speed = 50;
                 if (timerRef.current) clearInterval(timerRef.current);
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
-                    setRedrawDisplay(candidates[randomIdx]);
+                    setHighlightId(candidates[randomIdx].id); // Update highlight ID
+                    setRedrawDisplay(candidates[randomIdx]); // Keep for text display if needed, but we use grid now
                     SoundManager.spin();
-                    counter++;
-                }, speed);
+                }, 50);
 
                 setTimeout(() => {
                     clearInterval(timerRef.current);
-                    setIsRedrawSpinning(false); 
+                    setHighlightId(winner.id); // Stop on winner
                     setRedrawDisplay(winner); 
+                    setIsRedrawSpinning(false); 
                     triggerConfetti();
-                }, 2500);
+                }, 3000);
             }, [currentScene, currentPrize, visibleGroups]);
             
             const reopenRedrawMenu = useCallback(() => {
@@ -772,247 +839,57 @@
                 setShowRedrawMenu(true);   
             }, []);
 
-            const toggleParticipantActive = (pId) => {
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    return { ...scene, participants: scene.participants.map(p => p.id === pId ? { ...p, active: !p.active } : p) };
-                }));
-            };
-
-            const deleteParticipant = (pId) => {
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    return { ...scene, participants: scene.participants.filter(p => p.id !== pId) };
-                }));
-            };
-
-            const handleAddNames = () => {
-                if (!newNameList.trim()) return;
-                const names = newNameList.split('\n').filter(n => n.trim() !== '');
-                const groupToUse = newGroupName.trim() || '一般';
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    const newParticipants = names.map(name => ({ id: Date.now() + Math.random(), name: name.trim(), group: groupToUse, active: true, won: false, bonusWon: false }));
-                    return { ...scene, participants: [...scene.participants, ...newParticipants] };
-                }));
-                setVisibleGroups(prev => new Set(prev).add(groupToUse));
-                setNewNameList('');
-            };
-
-            const handleAdminLogin = () => {
-                if (adminPasswordInput === '355053') { setShowAdminLogin(false); setAdminPasswordInput(''); setLoginError(false); const firstPrize = currentScene.prizes[0]; setAdminTargetPrizeId(firstPrize ? firstPrize.id : null); setShowAdminPanel(true); } else { setLoginError(true); }
-            };
-
-            const updateWeight = (participantId, weight) => {
-                if (!adminTargetPrizeId) return;
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    const newWeights = { ...scene.weights };
-                    if (!newWeights[adminTargetPrizeId]) newWeights[adminTargetPrizeId] = {};
-                    newWeights[adminTargetPrizeId][participantId] = weight;
-                    return { ...scene, weights: newWeights };
-                }));
-            };
-
-            // 新增: 批量更新群組權重
-            const updateGroupWeights = (groupParticipants, weight) => {
-                if (!adminTargetPrizeId) return;
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    const newWeights = { ...scene.weights };
-                    if (!newWeights[adminTargetPrizeId]) newWeights[adminTargetPrizeId] = {};
-                    
-                    groupParticipants.forEach(p => {
-                        // 只更新未中獎的人
-                        if (!p.won) {
-                            newWeights[adminTargetPrizeId][p.id] = weight;
-                        }
-                    });
-                    
-                    return { ...scene, weights: newWeights };
-                }));
-            };
-
-            const handleDragStart = (e, participantId) => { e.dataTransfer.setData("text/plain", participantId); e.dataTransfer.effectAllowed = "move"; e.target.classList.add("dragging"); };
+            // ... (Other state helpers same as before) ...
+            const toggleParticipantActive = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.map(p => p.id===pId?{...p, active:!p.active}:p)} : s));
+            const deleteParticipant = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.filter(p => p.id!==pId)} : s));
+            const handleAddNames = () => { if(!newNameList.trim())return; const names=newNameList.split('\n').filter(n=>n.trim()); const g=newGroupName.trim()||'一般'; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:[...s.participants, ...names.map(n=>({id:Date.now()+Math.random(), name:n.trim(), group:g, active:true, won:false, bonusWon:false}))]}:s)); setVisibleGroups(prev=>new Set(prev).add(g)); setNewNameList(''); };
+            const handleAdminLogin = () => { if(adminPasswordInput==='355053'){setShowAdminLogin(false);setAdminPasswordInput('');setLoginError(false);setAdminTargetPrizeId(currentScene.prizes[0]?.id);setShowAdminPanel(true);}else{setLoginError(true);} };
+            const updateWeight = (pid, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, weights:{...s.weights, [adminTargetPrizeId]:{...(s.weights[adminTargetPrizeId]||{}), [pid]:w}}}:s)); };
+            const updateGroupWeights = (ps, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>{ if(s.id!==activeSceneId)return s; const newW={...s.weights}; if(!newW[adminTargetPrizeId])newW[adminTargetPrizeId]={}; ps.forEach(p=>{if(!p.won)newW[adminTargetPrizeId][p.id]=w;}); return {...s, weights:newW}; })); };
+            const handleDragStart = (e, id) => { e.dataTransfer.setData("text/plain", id); e.target.classList.add("dragging"); };
             const handleDragEnd = (e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); };
-            const handleDragOver = (e, groupName) => { e.preventDefault(); setDragOverGroup(groupName); };
-            const handleDrop = (e, targetGroup) => {
-                e.preventDefault(); setDragOverGroup(null);
-                const participantId = Number(e.dataTransfer.getData("text/plain"));
-                if (!participantId) return;
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    const updatedParticipants = scene.participants.map(p => { if (p.id === participantId) { return { ...p, group: targetGroup }; } return p; });
-                    return { ...scene, participants: updatedParticipants };
-                }));
-            };
+            const handleDragOver = (e, g) => { e.preventDefault(); setDragOverGroup(g); };
+            const handleDrop = (e, g) => { e.preventDefault(); setDragOverGroup(null); const id=Number(e.dataTransfer.getData("text/plain")); if(!id)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:s.participants.map(p=>p.id===id?{...p, group:g}:p)}:s)); };
+            const addNewScene = () => { const id=`scene-${Date.now()}`; setScenes([...scenes, {id, title:`新活動`, participants:[], prizes:[], history:[], weights:{}}]); setActiveSceneId(id); };
+            const deleteScene = (e, id) => { e.stopPropagation(); if(scenes.length===1)return; const ns=scenes.filter(s=>s.id!==id); setScenes(ns); if(activeSceneId===id)setActiveSceneId(ns[0].id); };
+            const addPrize = () => { if(!newPrizeName.trim())return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:newPrizeName, count:parseInt(newPrizeCount), value:parseInt(newPrizeValue)||0, isBonus:false}]} : s)); setNewPrizeName(''); setNewPrizeCount(1); setNewPrizeValue(0); };
+            const updateSceneTitle = (t) => setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, title:t}:s));
+            const openEditPrize = (p) => setEditingPrize({...p});
+            const closeEditPrize = () => setEditingPrize(null);
+            const handleUpdatePrize = () => { if(!editingPrize)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.map(p=>p.id===editingPrize.id?{...p, name:editingPrize.name, count:parseInt(editingPrize.count), value:parseInt(editingPrize.value)||0}:p)}:s)); closeEditPrize(); };
+            const handleDeletePrize = () => { if(!confirm("Delete?"))return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.filter(p=>p.id!==editingPrize.id)}:s)); closeEditPrize(); if(selectedPrizeId===editingPrize.id)setSelectedPrizeId(null); };
+            const handleAddBonus = () => { setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:bonusName, count:parseInt(bonusCount), value:parseInt(bonusAmount)||0, isBonus:true}]} : s)); setShowBonusModal(false); setBonusName('加碼紅包'); setBonusAmount(1000); setBonusCount(1); };
 
-            const addNewScene = () => {
-                const newId = `scene-${Date.now()}`;
-                const newScene = { id: newId, title: `新活動 ${scenes.length + 1}`, participants: [], prizes: [], history: [], weights: {} };
-                setScenes([...scenes, newScene]); setActiveSceneId(newId);
-            };
-
-            const deleteScene = (e, id) => {
-                e.stopPropagation(); if (scenes.length === 1) return;
-                const newScenes = scenes.filter(s => s.id !== id); setScenes(newScenes);
-                if (activeSceneId === id) setActiveSceneId(newScenes[0].id);
-            };
-
-            const addPrize = () => {
-                if (!newPrizeName.trim()) return;
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    return { ...scene, prizes: [...scene.prizes, { id: Date.now(), name: newPrizeName, count: parseInt(newPrizeCount), value: parseInt(newPrizeValue) || 0 }] };
-                }));
-                setNewPrizeName(''); setNewPrizeCount(1); setNewPrizeValue(0);
-            };
-
-            const updateSceneTitle = (title) => {
-                 setScenes(prev => prev.map(scene => { if (scene.id !== activeSceneId) return scene; return { ...scene, title }; }));
-            }
-            
-            // Edit Prize Functions
-            const openEditPrize = (prize) => {
-                setEditingPrize({ ...prize }); // Copy prize data to editing state
-            };
-
-            const closeEditPrize = () => {
-                setEditingPrize(null);
-            };
-
-            const handleUpdatePrize = () => {
-                if (!editingPrize || !editingPrize.name.trim()) return;
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    const updatedPrizes = scene.prizes.map(p => 
-                        p.id === editingPrize.id ? { ...p, name: editingPrize.name, count: parseInt(editingPrize.count), value: parseInt(editingPrize.value) || 0 } : p
-                    );
-                    return { ...scene, prizes: updatedPrizes };
-                }));
-                closeEditPrize();
-            };
-
-            const handleDeletePrize = () => {
-                if (!editingPrize) return;
-                if (!confirm("確定要刪除這個獎項嗎？")) return;
-                
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    const updatedPrizes = scene.prizes.filter(p => p.id !== editingPrize.id);
-                    return { ...scene, prizes: updatedPrizes };
-                }));
-                closeEditPrize();
-                if (selectedPrizeId === editingPrize.id) {
-                    setSelectedPrizeId(null);
-                }
-            };
-            
-            // Bonus Prize Handler
-            const handleAddBonus = () => {
-                setScenes(prev => prev.map(scene => {
-                    if (scene.id !== activeSceneId) return scene;
-                    return { 
-                        ...scene, 
-                        prizes: [...scene.prizes, { 
-                            id: Date.now(), 
-                            name: bonusName, 
-                            count: parseInt(bonusCount), 
-                            value: parseInt(bonusAmount) || 0,
-                            isBonus: true 
-                        }] 
-                    };
-                }));
-                setShowBonusModal(false);
-                setBonusName('加碼紅包');
-                setBonusAmount(1000);
-                setBonusCount(1);
-            };
-
-            // Keyboard Event Listener
+            // Keyboard
             useEffect(() => {
                 const handleKeyDown = (e) => {
-                    // PageUp Logic
                     if (e.code === 'PageUp') {
                         e.preventDefault();
-
-                        // 1. Main Screen -> Start Draw
-                        if (!isSpinning && !showWinnerModal && !showRedrawModal && !showRedrawMenu && !showSettings && !showAdminLogin && !showAdminPanel && !showBonusModal) {
-                            startDraw();
-                            return;
-                        }
-
-                        // 2. Winner Modal -> Confirm Win (開心收下)
-                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) {
-                            confirmWin();
-                            return;
-                        }
-
-                        // 3. Redraw Menu -> Start Redraw (開始重抽)
-                        if (showRedrawMenu) {
-                             executeRedraw(redrawSelectedGroups);
-                             return;
-                        }
-
-                        // 4. Redraw Modal -> Confirm Win (確認收下)
-                        if (showRedrawModal && !isRedrawSpinning) {
-                            confirmWin();
-                            return;
-                        }
+                        if (showRedrawModal && !isRedrawSpinning && currentRedrawTarget) { confirmWin(); return; } // Redraw result confirm
+                        if (showRedrawMenu) { executeRedraw(redrawSelectedGroups); return; } // Redraw menu confirm
+                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) { confirmWin(); return; } // Normal win confirm
+                        if (!isSpinning && !showWinnerModal && !showRedrawModal && !showRedrawMenu && !showSettings && !showAdminLogin && !showAdminPanel && !showBonusModal) { startDraw(); return; } // Start draw
                     }
-
-                    // PageDown Logic
                     if (e.code === 'PageDown') {
                         e.preventDefault();
-
-                        // 1. Winner Modal -> Redraw (再抽一次)
-                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) {
-                            handleRedrawClick();
-                            return;
-                        }
-
-                        // 2. Redraw Modal -> Try Again (再試一次)
-                        if (showRedrawModal && !isRedrawSpinning) {
-                             reopenRedrawMenu();
-                             return;
-                        }
+                        if (showRedrawMenu) { handleRedrawCancel(); return; } // Cancel Redraw Menu
+                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) { handleRedrawClick(); return; } // Re-draw
+                        if (showRedrawModal && !isRedrawSpinning) { reopenRedrawMenu(); return; } // Retry redraw
                     }
                 };
-
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [
-                isSpinning,
-                showWinnerModal,
-                showRedrawModal,
-                showRedrawMenu,
-                showSettings,
-                showAdminLogin,
-                showAdminPanel,
-                showBonusModal,
-                isRedrawSpinning,
-                redrawSelectedGroups,
-                lastWinner,
-                startDraw,
-                confirmWin,
-                handleRedrawClick,
-                executeRedraw, 
-                reopenRedrawMenu
-            ]);
+            }, [isSpinning, showWinnerModal, showRedrawModal, showRedrawMenu, showSettings, showAdminLogin, showAdminPanel, showBonusModal, isRedrawSpinning, currentRedrawTarget, redrawSelectedGroups, startDraw, confirmWin, handleRedrawClick, executeRedraw, reopenRedrawMenu, handleRedrawCancel]);
 
             return (
-                <div className="h-screen flex flex-col p-2 md:p-6 max-w-[1600px] mx-auto w-full">
+                <div className="h-screen flex flex-col p-2 md:p-6 max-w-[95%] mx-auto w-full">
                     <input type="file" ref={fileInputRef} onChange={handleImport} style={{display: 'none'}} accept=".json" />
                     <input type="file" ref={participantsInputRef} onChange={handleImportParticipants} style={{display: 'none'}} accept=".csv" />
 
                     {/* Header */}
                     <div className="flex-none flex flex-wrap gap-3 mb-4 items-center">
                         <div className="text-3xl font-black text-red-600 mr-4 drop-shadow-sm select-none">
-                            {/* 修改：將觸發點從 U 改為 K */}
-                            LUC<span 
-                                onClick={() => { setShowAdminLogin(true); setLoginError(false); }} 
-                                className="cursor-default"
-                            >K</span>Y DRAW
+                            LUC<span onClick={() => { setShowAdminLogin(true); setLoginError(false); }} className="cursor-default">K</span>Y DRAW
                         </div>
                         {scenes.map(scene => (
                             <div key={scene.id} onClick={() => setActiveSceneId(scene.id)} className={`relative px-6 py-3 rounded-xl cursor-pointer transition-all flex items-center gap-2 font-bold shadow-md select-none ${activeSceneId === scene.id ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white scale-105 shadow-red-300 ring-4 ring-red-200' : 'bg-white text-gray-500 hover:bg-red-50 hover:text-red-500'}`}>
@@ -1038,46 +915,79 @@
                                 <Coins size={18} /> 加碼
                             </button>
                             
-                            {/* Removed explicit Admin Login Button - Now hidden in 'U' */}
                             <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-red-700 hover:scale-105 transition-all font-bold ring-2 ring-red-200"><Settings size={20} /><span>設定</span></button>
                         </div>
                     </div>
 
                     {/* Main Content Area */}
                     <main className="impact-panel flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 p-4 relative overflow-hidden">
-                        {/* Left: The Wheel */}
-                        <div className="lg:col-span-7 flex flex-col items-center justify-center h-full min-h-0 overflow-y-auto lg:overflow-visible">
-                            <div className="flex-none mb-4 text-center w-full max-w-lg">
-                                <div className="text-red-500 font-black mb-2 tracking-widest text-sm uppercase bg-red-100 inline-block px-3 py-1 rounded-full border border-red-200">Current Prize</div>
-                                <h2 className="text-5xl md:text-6xl font-black text-gray-800 flex items-center justify-center gap-4 drop-shadow-sm my-2 leading-relaxed py-4">
-                                    <Gift className="text-red-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
-                                    <span className="">{currentPrize ? currentPrize.name : "—"}</span>
-                                </h2>
-                                <div className="flex justify-center mt-2"><span className="bg-gray-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">剩餘數量: {currentPrize ? currentPrize.count : 0}</span></div>
-                            </div>
-
-                            {/* The Big Animated Card */}
-                            <div className={`w-full max-w-2xl aspect-[16/9] bg-gradient-to-br from-white to-gray-50 rounded-[32px] flex items-center justify-center relative overflow-hidden transition-all ${isSpinning ? 'rainbow-border' : 'border-[6px] border-yellow-400 shadow-[0_15px_40px_-10px_rgba(239,68,68,0.5)]'}`}>
-                                <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
-                                <div className="z-10 text-center w-full px-4">
-                                    {isSpinning ? (
-                                        <div className="animate-pop">
-                                            <div className="text-6xl md:text-8xl font-black gold-text-impact tracking-tight leading-normal py-2">{displayParticipant?.name}</div>
-                                            <div className="text-xl md:text-2xl font-bold gold-text-impact mt-2 tracking-widest pb-2">{displayParticipant?.group || ''}</div>
+                        
+                        {/* 2. Middle: Grid Selection Display (8 Cols, taking left space) */}
+                        <div className="lg:col-span-8 flex flex-col items-center h-full min-h-0 overflow-y-auto lg:overflow-hidden relative">
+                            
+                            {/* Grid Draw Area (Top) */}
+                            <div className="flex-1 w-full bg-white/50 rounded-3xl border-4 border-red-200 p-4 relative overflow-hidden flex flex-col mb-4">
+                                <div ref={mainGridRef} className="flex-1 overflow-y-auto custom-scrollbar content-center">
+                                    {gridCandidates.length > 0 ? (
+                                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3 w-full">
+                                            {gridCandidates.map(p => {
+                                                const isHighlighted = p.id === highlightId;
+                                                // Check winner status strictly for style
+                                                const isWinner = currentPrize && currentPrize.isBonus ? p.bonusWon : p.won;
+                                                
+                                                return (
+                                                    <div 
+                                                        key={p.id}
+                                                        id={`cell-${p.id}`}
+                                                        className={`
+                                                            aspect-square rounded-xl flex items-center justify-center p-1 shadow-sm transition-all duration-75 border-2
+                                                            ${isWinner 
+                                                                ? 'grid-cell-already-won' // Black bg, white text
+                                                                : (isHighlighted 
+                                                                    ? 'grid-cell-winner shadow-2xl border-yellow-500' // Gold highlight
+                                                                    : 'grid-cell-normal border-red-300 opacity-90') // Normal Red
+                                                            }
+                                                        `}
+                                                    >
+                                                        {/* Adjusted Text Size for 12 cols: text-sm or text-base usually works best */}
+                                                        <div className="font-black text-center whitespace-nowrap overflow-hidden text-ellipsis text-sm md:text-base lg:text-lg text-white leading-none w-full">
+                                                            {p.name}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col items-center animate-bounce-slow opacity-60">
-                                            <span className="text-8xl mb-4 opacity-50">🎰</span>
-                                            <span className="text-4xl md:text-5xl font-black gold-text-impact tracking-wider leading-relaxed py-2">READY TO DRAW</span>
+                                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                            <span className="text-4xl opacity-30">🎰</span>
+                                            <p className="mt-2 font-bold">READY TO DRAW</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                            <button onClick={startDraw} disabled={isSpinning || !currentPrize || currentPrize.count === 0} className={`mt-10 w-full max-w-sm py-5 rounded-2xl text-3xl font-black shadow-[0_10px_0_0_rgba(0,0,0,0.2)] transform transition-all active:shadow-none active:translate-y-[10px] ${(isSpinning || !currentPrize || currentPrize.count === 0) ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-y-[10px]' : 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:brightness-110 shadow-[0_10px_0_0_#9f1239]'}`}>{isSpinning ? 'SPINNING...' : (currentPrize && currentPrize.count === 0 ? '獎項已抽完' : '開始抽獎 !')}</button>
+
+                            {/* Prize Info (Bottom) - Swapped */}
+                            <div className="flex-none mb-2 text-center w-full max-w-lg z-10">
+                                {/* Label Removed to save space */}
+                                <h2 className="text-5xl md:text-6xl font-black text-gray-800 flex items-center justify-center gap-4 drop-shadow-sm my-1 leading-relaxed py-1">
+                                    <Gift className="text-red-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
+                                    <span className="">{currentPrize ? currentPrize.name : "—"}</span>
+                                </h2>
+                                <div className="flex justify-center gap-4 mt-2">
+                                    <span className="bg-gray-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">剩餘: {currentPrize ? currentPrize.count : 0}</span>
+                                    {/* Added Value Display */}
+                                    {currentPrize && currentPrize.value > 0 && <span className="bg-yellow-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">價值: ${currentPrize.value.toLocaleString()}</span>}
+                                </div>
+                            </div>
+
+                            {/* Start Button */}
+                            <div className="flex-none w-full flex justify-center z-10">
+                                <button onClick={startDraw} disabled={isSpinning || !currentPrize || currentPrize.count === 0} className={`w-full max-w-sm py-4 rounded-2xl text-2xl font-black shadow-[0_8px_0_0_rgba(0,0,0,0.2)] transform transition-all active:shadow-none active:translate-y-[8px] ${(isSpinning || !currentPrize || currentPrize.count === 0) ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-y-[8px]' : 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:brightness-110 shadow-[0_8px_0_0_#9f1239]'}`}>{isSpinning ? 'SPINNING...' : (currentPrize && currentPrize.count === 0 ? '獎項已抽完' : '開始抽獎 !')}</button>
+                            </div>
                         </div>
 
-                        {/* Right: Info Panel */}
-                        <div className="lg:col-span-5 flex flex-col gap-4 h-full min-h-0">
+                        {/* 3. Right: Info Panel (4 Cols) - Same as before */}
+                        <div className="lg:col-span-4 flex flex-col gap-4 h-full min-h-0">
                             {/* Prize List */}
                             <div className="flex-1 min-h-0 bg-white rounded-3xl p-1 shadow-inner border-2 border-red-100 flex flex-col">
                                 <div className="bg-red-50 p-4 rounded-t-[20px] flex-none flex items-center justify-between border-b-2 border-red-100">
@@ -1402,12 +1312,12 @@
                     {/* Redraw Selection Menu */}
                     {showRedrawMenu && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleRedrawCancel}>
-                            <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center relative shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
+                            <div className="bg-white rounded-3xl p-8 max-w-4xl w-full text-center relative shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-2xl font-black text-gray-800 mb-2 flex items-center justify-center gap-2"><RefreshCw className="text-red-500"/> 選擇重抽範圍</h3>
                                 <div className="flex justify-end mb-2">
                                      <button onClick={selectAllRedrawGroups} className="text-sm font-bold text-red-500 hover:underline">{redrawSelectedGroups.size === Object.keys(groupedParticipants).length ? '取消全選' : '全選'}</button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto overflow-x-hidden p-1 mb-6">
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto overflow-x-hidden p-1 mb-6">
                                     {Object.keys(groupedParticipants).map(groupName => (
                                         <button key={groupName} onClick={() => toggleRedrawGroup(groupName)} className={`py-3 rounded-lg border-2 font-bold transition flex items-center justify-center gap-2 ${redrawSelectedGroups.has(groupName) ? 'bg-red-500 text-white border-red-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-red-100 hover:border-red-300'}`}>
                                             {redrawSelectedGroups.has(groupName) && <CheckCircle size={16} />}
@@ -1426,21 +1336,42 @@
                     {/* Small Redraw Modal */}
                     {showRedrawModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(239,68,68,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
+                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-[95%] max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(239,68,68,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
                                 <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-red-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
                                     <RefreshCw size={36} className="text-white md:hidden animate-spin-slow" />
                                     <RefreshCw size={72} className="text-white hidden md:block animate-spin-slow" />
                                 </div>
-                                <div className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
+                                <div ref={redrawGridRef} className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
                                     <div className="text-red-400 font-black uppercase tracking-widest text-sm md:text-xl mb-2 md:mb-4 mt-4 md:mt-0">
                                         {isRedrawSpinning ? "REROLLING..." : "NEW WINNER!"}
                                     </div>
                                     {isRedrawSpinning ? (
-                                        <div className="w-full flex flex-col items-center justify-center flex-1 min-h-[200px]">
-                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black text-gray-300 animate-pulse truncate py-2">{redrawDisplay?.name}</div>
-                                            <div className="text-lg md:text-2xl font-bold text-gray-300 mt-2 tracking-widest">{redrawDisplay?.group}</div>
+                                        /* Redraw Grid Animation */
+                                        <div className="w-full grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3 p-4 bg-white/50 rounded-3xl border-4 border-red-200">
+                                            {/* Show current draw pool */}
+                                            {drawPool.map(p => {
+                                                const isHighlighted = p.id === highlightId;
+                                                return (
+                                                    <div 
+                                                        key={p.id}
+                                                        id={`redraw-cell-${p.id}`} // Change for redraw
+                                                        className={`
+                                                            aspect-square rounded-xl flex items-center justify-center p-1 shadow-sm transition-all duration-75 border-2
+                                                            ${isHighlighted 
+                                                                ? 'grid-cell-winner shadow-2xl border-yellow-500' 
+                                                                : 'grid-cell-normal border-red-300 opacity-90'}
+                                                        `}
+                                                    >
+                                                        {/* 修改：字體調整為與主畫面一致 text-sm md:text-base lg:text-lg */}
+                                                        <div className="font-black text-center whitespace-nowrap overflow-hidden text-ellipsis text-sm md:text-base lg:text-lg text-white leading-none w-full">
+                                                            {p.name}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     ) : (
+                                        /* Redraw Winner Result */
                                         <div className="w-full flex flex-col items-center animate-pop flex-1 justify-center">
                                             <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-2 text-center w-full">{redrawDisplay?.name}</div>
                                             <div className="text-lg md:text-2xl font-bold gold-text-impact mb-6 tracking-widest opacity-90 text-center w-full">{redrawDisplay?.group}</div>
@@ -1454,7 +1385,7 @@
 
                                             <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full max-w-2xl mt-auto">
                                                 <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下</button>
-                                                <button onClick={reopenRedrawMenu} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-8 md:h-8"/> 再試一次</button>
+                                                <button onClick={reopenRedrawMenu} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-8 md:h-8"/> 棄權重抽</button>
                                             </div>
                                         </div>
                                     )}
@@ -1481,7 +1412,7 @@
                                     </div>
                                     <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full mt-auto">
                                         <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-7 md:h-7"/> 開心收下 🎉</button>
-                                        <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 再抽一次 🔄</button>
+                                        <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 棄權重抽 🔄</button>
                                     </div>
                                 </div>
                             </div>
