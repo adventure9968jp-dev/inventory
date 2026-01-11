@@ -1082,7 +1082,9 @@
                                     <Gift className="text-red-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
                                     <span className="">{currentPrize ? currentPrize.name : "—"}</span>
                                 </h2>
-                                <div className="flex justify-center gap-4 mt-2">
+                                <div className="flex justify-center gap-3 mt-2 flex-wrap">
+                                    <span className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">未中獎: {currentScene.participants.filter(p => !p.won).length}</span>
+                                    <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">總人數: {currentScene.participants.length}</span>
                                     <span className="bg-gray-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">剩餘: {currentPrize ? currentPrize.count : 0}</span>
                                     {/* Added Value Display */}
                                     {currentPrize && currentPrize.value > 0 && <span className="bg-yellow-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">價值: ${currentPrize.value.toLocaleString()}</span>}
