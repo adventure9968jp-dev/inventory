@@ -171,6 +171,13 @@
         ::-webkit-scrollbar-corner {
             background: transparent;
         }
+        
+        .cursor-grab {
+            cursor: grab;
+        }
+        .cursor-grab:active {
+            cursor: grabbing;
+        }
     </style>
 </head>
 <body>
@@ -277,6 +284,7 @@
         const FileSpreadsheet = (props) => (<Icon {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></Icon>);
         const Coins = (props) => (<Icon {...props}><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m7.1 13.84.3-1.8" /></Icon>);
         const Pencil = (props) => (<Icon {...props}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></Icon>);
+        const GripVertical = (props) => (<Icon {...props}><circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" /></Icon>);
 
         // 預設資料
         const DEFAULT_SCENES = [
@@ -850,6 +858,107 @@
             const handleDragEnd = (e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); };
             const handleDragOver = (e, g) => { e.preventDefault(); setDragOverGroup(g); };
             const handleDrop = (e, g) => { e.preventDefault(); setDragOverGroup(null); const id=Number(e.dataTransfer.getData("text/plain")); if(!id)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:s.participants.map(p=>p.id===id?{...p, group:g}:p)}:s)); };
+            
+            // --- New Drag & Drop Logic for Groups ---
+            
+            const handleGroupDragStart = (e, groupName) => {
+                e.stopPropagation();
+                e.dataTransfer.setData("application/lucky-draw-group", groupName);
+                e.dataTransfer.effectAllowed = "move";
+            };
+
+            const handleGroupCardDrop = (e, targetGroupName) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragOverGroup(null);
+
+                const draggedGroupName = e.dataTransfer.getData("application/lucky-draw-group");
+                
+                // Case 1: Reordering Groups
+                if (draggedGroupName) {
+                    if (draggedGroupName === targetGroupName) return;
+                    
+                    setScenes(prev => prev.map(scene => {
+                        if (scene.id !== activeSceneId) return scene;
+                        
+                        // Extract groups in order
+                        const currentGroups = [];
+                        const groupMap = {};
+                        scene.participants.forEach(p => {
+                            const g = p.group || '未分類';
+                            if (!groupMap[g]) {
+                                groupMap[g] = [];
+                                currentGroups.push(g);
+                            }
+                            groupMap[g].push(p);
+                        });
+                        
+                        const sourceIdx = currentGroups.indexOf(draggedGroupName);
+                        const targetIdx = currentGroups.indexOf(targetGroupName);
+                        
+                        if (sourceIdx === -1 || targetIdx === -1) return scene;
+                        
+                        // Move group in the list
+                        currentGroups.splice(sourceIdx, 1);
+                        currentGroups.splice(targetIdx, 0, draggedGroupName);
+                        
+                        // Reconstruct participants array based on new group order
+                        let newParticipants = [];
+                        currentGroups.forEach(g => {
+                            newParticipants = newParticipants.concat(groupMap[g]);
+                        });
+                        
+                        return { ...scene, participants: newParticipants };
+                    }));
+                    return;
+                }
+
+                // Case 2: Moving Participant to Group (Existing logic)
+                const id = Number(e.dataTransfer.getData("text/plain"));
+                if (id) {
+                    setScenes(prev => prev.map(s => 
+                        s.id === activeSceneId 
+                        ? { ...s, participants: s.participants.map(p => p.id === id ? { ...p, group: targetGroupName } : p) } 
+                        : s
+                    ));
+                }
+            };
+
+            // Existing logic for reordering participants within a group
+            const handleParticipantDragOver = (e) => {
+                e.preventDefault(); 
+                e.stopPropagation(); 
+            };
+
+            const handleParticipantDrop = (e, targetId) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const draggedId = Number(e.dataTransfer.getData("text/plain"));
+                if (!draggedId || draggedId === targetId) return;
+
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    
+                    const list = [...scene.participants];
+                    const dragIdx = list.findIndex(p => p.id === draggedId);
+                    
+                    if (dragIdx === -1) return scene;
+                    
+                    const [movedItem] = list.splice(dragIdx, 1);
+                    const targetIdx = list.findIndex(p => p.id === targetId);
+                    
+                    if (targetIdx === -1) {
+                        list.push(movedItem);
+                    } else {
+                        movedItem.group = list[targetIdx].group;
+                        list.splice(targetIdx, 0, movedItem);
+                    }
+                    
+                    return { ...scene, participants: list };
+                }));
+            };
+
             const addNewScene = () => { const id=`scene-${Date.now()}`; setScenes([...scenes, {id, title:`新活動`, participants:[], prizes:[], history:[], weights:{}}]); setActiveSceneId(id); };
             const deleteScene = (e, id) => { e.stopPropagation(); if(scenes.length===1)return; const ns=scenes.filter(s=>s.id!==id); setScenes(ns); if(activeSceneId===id)setActiveSceneId(ns[0].id); };
             const addPrize = () => { if(!newPrizeName.trim())return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:newPrizeName, count:parseInt(newPrizeCount), value:parseInt(newPrizeValue)||0, isBonus:false}]} : s)); setNewPrizeName(''); setNewPrizeCount(1); setNewPrizeValue(0); };
@@ -1260,7 +1369,16 @@
                                         <div className="flex flex-wrap gap-2 mb-6 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
                                             {Object.keys(groupedParticipants).length === 0 && <div className="text-gray-400 text-sm">暫無群組</div>}
                                             {Object.keys(groupedParticipants).map(groupName => (
-                                                <button key={groupName} onClick={() => toggleGroupVisibility(groupName)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${visibleGroups.has(groupName) ? 'bg-red-500 text-white border-red-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-gray-300 hover:border-red-300'}`}>
+                                                <button 
+                                                    key={groupName} 
+                                                    draggable="true"
+                                                    onDragStart={(e) => handleGroupDragStart(e, groupName)}
+                                                    onDragOver={(e) => e.preventDefault()}
+                                                    onDrop={(e) => handleGroupCardDrop(e, groupName)}
+                                                    onClick={() => toggleGroupVisibility(groupName)} 
+                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-move ${visibleGroups.has(groupName) ? 'bg-red-500 text-white border-red-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-gray-300 hover:border-red-300'}`}
+                                                    title="可拖曳調整順序"
+                                                >
                                                     {visibleGroups.has(groupName) ? <CheckCircle size={12} className="text-white"/> : <div className="w-3 h-3 rounded-full border border-gray-400"></div>}
                                                     {groupName}
                                                 </button>
@@ -1270,15 +1388,31 @@
                                             {Object.entries(groupedParticipants)
                                                 .filter(([groupName]) => visibleGroups.has(groupName))
                                                 .map(([groupName, participants]) => (
-                                                <div key={groupName} className={`bg-white rounded-xl border-2 overflow-hidden transition-all animate-pop ${dragOverGroup === groupName ? 'drag-over' : 'border-gray-100'}`} onDragOver={(e) => handleDragOver(e, groupName)} onDrop={(e) => handleDrop(e, groupName)}>
+                                                <div 
+                                                    key={groupName} 
+                                                    className={`bg-white rounded-xl border-2 overflow-hidden transition-all animate-pop cursor-grab active:cursor-grabbing ${dragOverGroup === groupName ? 'drag-over' : 'border-gray-100'}`}
+                                                    draggable="true"
+                                                    onDragStart={(e) => handleGroupDragStart(e, groupName)}
+                                                    onDragOver={(e) => handleDragOver(e, groupName)} 
+                                                    onDrop={(e) => handleGroupCardDrop(e, groupName)}
+                                                >
                                                     <div className="bg-gray-50 px-4 py-2 font-black text-gray-700 flex items-center gap-2 border-b-2 border-gray-100">
+                                                        <GripVertical size={16} className="text-gray-400 cursor-grab" />
                                                         <Building size={16} className="text-red-500"/>
                                                         {groupName}
                                                         <span className="text-xs font-normal text-gray-400 ml-auto">{participants.length} 人</span>
                                                     </div>
                                                     <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                         {participants.map(p => (
-                                                            <div key={p.id} draggable="true" onDragStart={(e) => handleDragStart(e, p.id)} onDragEnd={(e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); }} className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all relative group cursor-move ${p.won ? 'bg-gray-100 border-gray-100 opacity-50' : 'bg-white border-gray-100 hover:border-red-200 hover:shadow-sm'}`}>
+                                                            <div 
+                                                                key={p.id} 
+                                                                draggable="true" 
+                                                                onDragStart={(e) => handleDragStart(e, p.id)} 
+                                                                onDragEnd={(e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); }}
+                                                                onDragOver={handleParticipantDragOver}
+                                                                onDrop={(e) => handleParticipantDrop(e, p.id)}
+                                                                className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all relative group cursor-move ${p.won ? 'bg-gray-100 border-gray-100 opacity-50' : 'bg-white border-gray-100 hover:border-red-200 hover:shadow-sm'}`}
+                                                            >
                                                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                                                     <input type="checkbox" checked={p.active} disabled={p.won} onChange={() => toggleParticipantActive(p.id)} className="w-4 h-4 accent-red-600 rounded shrink-0 cursor-pointer" onClick={(e) => e.stopPropagation()} />
                                                                     <span className={`font-bold truncate text-sm ${!p.active ? 'line-through text-gray-400' : 'text-gray-700'}`}>{p.name}</span>
