@@ -400,6 +400,7 @@
             const [newPrizeName, setNewPrizeName] = useState('');
             const [newPrizeCount, setNewPrizeCount] = useState(1);
             const [newPrizeValue, setNewPrizeValue] = useState(0); 
+            // Removed newPrizeIsBonus state
             
             const [dragOverGroup, setDragOverGroup] = useState(null);
             const [visibleGroups, setVisibleGroups] = useState(new Set()); 
@@ -674,6 +675,7 @@
                 );
 
                 // 2. Calculate the ELIGIBLE candidates (for winning)
+                // 加碼邏輯：如果是加碼獎項，檢查 bonusWon；如果是一般獎項，檢查 won
                 const eligibleCandidates = visibleParticipants.filter(p => 
                     currentPrize.isBonus ? !p.bonusWon : !p.won
                 );
@@ -961,11 +963,17 @@
 
             const addNewScene = () => { const id=`scene-${Date.now()}`; setScenes([...scenes, {id, title:`新活動`, participants:[], prizes:[], history:[], weights:{}}]); setActiveSceneId(id); };
             const deleteScene = (e, id) => { e.stopPropagation(); if(scenes.length===1)return; const ns=scenes.filter(s=>s.id!==id); setScenes(ns); if(activeSceneId===id)setActiveSceneId(ns[0].id); };
-            const addPrize = () => { if(!newPrizeName.trim())return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:newPrizeName, count:parseInt(newPrizeCount), value:parseInt(newPrizeValue)||0, isBonus:false}]} : s)); setNewPrizeName(''); setNewPrizeCount(1); setNewPrizeValue(0); };
+            const addPrize = () => { 
+                if(!newPrizeName.trim()) return; 
+                setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:newPrizeName, count:parseInt(newPrizeCount), value:parseInt(newPrizeValue)||0, isBonus:false}]} : s)); 
+                setNewPrizeName(''); 
+                setNewPrizeCount(1); 
+                setNewPrizeValue(0); 
+            };
             const updateSceneTitle = (t) => setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, title:t}:s));
             const openEditPrize = (p) => setEditingPrize({...p});
             const closeEditPrize = () => setEditingPrize(null);
-            const handleUpdatePrize = () => { if(!editingPrize)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.map(p=>p.id===editingPrize.id?{...p, name:editingPrize.name, count:parseInt(editingPrize.count), value:parseInt(editingPrize.value)||0}:p)}:s)); closeEditPrize(); };
+            const handleUpdatePrize = () => { if(!editingPrize)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.map(p=>p.id===editingPrize.id?{...p, name:editingPrize.name, count:parseInt(editingPrize.count), value:parseInt(editingPrize.value)||0, isBonus: editingPrize.isBonus}:p)}:s)); closeEditPrize(); };
             const handleDeletePrize = () => { if(!confirm("Delete?"))return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.filter(p=>p.id!==editingPrize.id)}:s)); closeEditPrize(); if(selectedPrizeId===editingPrize.id)setSelectedPrizeId(null); };
             const handleAddBonus = () => { setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:bonusName, count:parseInt(bonusCount), value:parseInt(bonusAmount)||0, isBonus:true}]} : s)); setShowBonusModal(false); setBonusName('加碼紅包'); setBonusAmount(1000); setBonusCount(1); };
 
