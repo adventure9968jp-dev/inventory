@@ -329,6 +329,7 @@
         const GripVertical = (props) => (<Icon {...props}><circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" /></Icon>);
         const Volume2 = (props) => (<Icon {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></Icon>);
         const Play = (props) => (<Icon {...props}><polygon points="5 3 19 12 5 21 5 3" /></Icon>);
+        const UserList = (props) => (<Icon {...props}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M8 14h.01" /><path d="M12 14h.01" /><path d="M16 14h.01" /><path d="M8 18h.01" /><path d="M12 18h.01" /><path d="M16 18h.01" /></Icon>);
 
         // 預設資料
         const DEFAULT_SCENES = [
@@ -429,14 +430,15 @@
             const [lastWinner, setLastWinner] = useState(null);
             const [selectedPrizeId, setSelectedPrizeId] = useState(null);
 
-            const [showRedrawMenu, setShowRedrawMenu] = useState(false);
+            // Removed showRedrawMenu
             const [showRedrawModal, setShowRedrawModal] = useState(false);
             const [isRedrawSpinning, setIsRedrawSpinning] = useState(false);
             
             // For Redraw Modal result display (just name string or object)
             const [redrawDisplay, setRedrawDisplay] = useState(null);
+            
+            // Removed redrawSelectedGroups
 
-            const [redrawSelectedGroups, setRedrawSelectedGroups] = useState(new Set());
             const [currentRedrawTarget, setCurrentRedrawTarget] = useState(null);
             
             const [newNameList, setNewNameList] = useState('');
@@ -460,6 +462,9 @@
             const [bonusName, setBonusName] = useState('加碼紅包');
             const [bonusAmount, setBonusAmount] = useState(1000);
             const [bonusCount, setBonusCount] = useState(1);
+
+            // Prize Winner List Modal State
+            const [viewingPrizeWinners, setViewingPrizeWinners] = useState(null);
 
             // Custom Sound States
             const [customSoundNames, setCustomSoundNames] = useState({ spin: '', win: '' });
@@ -817,46 +822,13 @@
             }, [activeSceneId, lastWinner]);
 
             // ... (Redraw logic) ...
-            const handleRedrawClick = useCallback(() => { 
-                setShowWinnerModal(false); 
-                setRedrawSelectedGroups(new Set(Object.keys(groupedParticipants))); 
-                setShowRedrawMenu(true); 
-            }, [groupedParticipants]);
-
-            const handleRedrawCancel = useCallback(() => {
-                setShowRedrawMenu(false);
-                if (lastWinner) {
-                    setShowWinnerModal(true);
-                }
-            }, [lastWinner]);
-
-            const toggleRedrawGroup = (groupName) => {
-                const newSet = new Set(redrawSelectedGroups);
-                if (newSet.has(groupName)) {
-                    newSet.delete(groupName);
-                } else {
-                    newSet.add(groupName);
-                }
-                setRedrawSelectedGroups(newSet);
-            };
-
-            const selectAllRedrawGroups = () => {
-                const allGroups = Object.keys(groupedParticipants);
-                if (redrawSelectedGroups.size === allGroups.length) {
-                    setRedrawSelectedGroups(new Set());
-                } else {
-                    setRedrawSelectedGroups(new Set(allGroups));
-                }
-            };
+            
+            // Toggle Redraw Group is not needed with new logic
+            // Select All Redraw Groups is not needed with new logic
 
             const executeRedraw = useCallback((targetGroups) => {
                 if (!currentPrize || currentPrize.count <= 0) { alert("😱 這個獎項已經發完了！無法重抽。"); return; }
                 
-                if (targetGroups.size === 0) {
-                     alert("請至少選擇一個群組！");
-                     return;
-                }
-
                 setCurrentRedrawTarget(targetGroups);
 
                 const isBonusDraw = currentPrize.isBonus;
@@ -878,8 +850,10 @@
                 if (!winner) { return; }
 
                 setDrawPool(displayPool); // Update draw pool for the redraw grid (Here we only show eligible for focus)
-                setShowRedrawMenu(false); 
-                setShowRedrawModal(true); 
+                
+                // --- NEW: Direct Redraw ---
+                setShowWinnerModal(false); // Close winner modal if open
+                setShowRedrawModal(true);  // Open redraw animation modal
                 setIsRedrawSpinning(true);
                 setHighlightId(null);
                 setLastWinner({ person: winner, prize: currentPrize });
@@ -906,12 +880,30 @@
                     setIsRedrawSpinning(false); 
                     triggerConfetti(); // Plays win sound
                 }, 3000);
-            }, [currentScene, currentPrize, visibleGroups]);
+            }, [currentScene, currentPrize]);
             
-            const reopenRedrawMenu = useCallback(() => {
-                setShowRedrawModal(false); 
-                setShowRedrawMenu(true);   
-            }, []);
+            // Handle Redraw Click (Directly Execute)
+            const handleRedrawClick = useCallback(() => { 
+                // Directly execute using current visible groups as target
+                executeRedraw(visibleGroups); 
+            }, [visibleGroups, executeRedraw]);
+
+            // Handle Retry Redraw
+            const handleRetryRedraw = useCallback(() => {
+                // If we are retrying, we just run executeRedraw again with the same target
+                if (currentRedrawTarget) {
+                    executeRedraw(currentRedrawTarget);
+                } else {
+                    executeRedraw(visibleGroups);
+                }
+            }, [currentRedrawTarget, visibleGroups, executeRedraw]);
+
+            // --- Handlers for Prize Winners Modal ---
+            const openPrizeWinners = (e, prize) => {
+                e.stopPropagation();
+                setViewingPrizeWinners(prize);
+            };
+            const closePrizeWinners = () => setViewingPrizeWinners(null);
 
             // ... (Other state helpers same as before) ...
             const toggleParticipantActive = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.map(p => p.id===pId?{...p, active:!p.active}:p)} : s));
@@ -1096,20 +1088,19 @@
                     if (e.code === 'PageUp') {
                         e.preventDefault();
                         if (showRedrawModal && !isRedrawSpinning && currentRedrawTarget) { confirmWin(); return; } // Redraw result confirm
-                        if (showRedrawMenu) { executeRedraw(redrawSelectedGroups); return; } // Redraw menu confirm
-                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) { confirmWin(); return; } // Normal win confirm
-                        if (!isSpinning && !showWinnerModal && !showRedrawModal && !showRedrawMenu && !showSettings && !showAdminLogin && !showAdminPanel && !showBonusModal) { startDraw(); return; } // Start draw
+                        if (showWinnerModal && lastWinner && !showRedrawModal) { confirmWin(); return; } // Normal win confirm
+                        if (!isSpinning && !showWinnerModal && !showRedrawModal && !showSettings && !showAdminLogin && !showAdminPanel && !showBonusModal) { startDraw(); return; } // Start draw
                     }
                     if (e.code === 'PageDown') {
                         e.preventDefault();
-                        if (showRedrawMenu) { handleRedrawCancel(); return; } // Cancel Redraw Menu
-                        if (showWinnerModal && lastWinner && !showRedrawModal && !showRedrawMenu) { handleRedrawClick(); return; } // Re-draw
-                        if (showRedrawModal && !isRedrawSpinning) { reopenRedrawMenu(); return; } // Retry redraw
+                        // Removed showRedrawMenu check
+                        if (showWinnerModal && lastWinner && !showRedrawModal) { handleRedrawClick(); return; } // Re-draw
+                        if (showRedrawModal && !isRedrawSpinning) { handleRetryRedraw(); return; } // Retry redraw
                     }
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [isSpinning, showWinnerModal, showRedrawModal, showRedrawMenu, showSettings, showAdminLogin, showAdminPanel, showBonusModal, isRedrawSpinning, currentRedrawTarget, redrawSelectedGroups, startDraw, confirmWin, handleRedrawClick, executeRedraw, reopenRedrawMenu, handleRedrawCancel]);
+            }, [isSpinning, showWinnerModal, showRedrawModal, showSettings, showAdminLogin, showAdminPanel, showBonusModal, isRedrawSpinning, currentRedrawTarget, startDraw, confirmWin, handleRedrawClick, executeRedraw, handleRetryRedraw]);
 
             return (
                 <div className="h-screen flex flex-col p-2 md:p-6 max-w-[95%] mx-auto w-full">
@@ -1238,6 +1229,15 @@
                                                     {prize.isBonus && <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mt-0.5">加碼 (Bonus)</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2">
+                                                    {/* New: Prize Winners List Button */}
+                                                    <button 
+                                                        onClick={(e) => openPrizeWinners(e, prize)} 
+                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100 mr-1"
+                                                        title="得獎名單"
+                                                    >
+                                                        <UserList size={16} />
+                                                    </button>
+
                                                     <div className={`w-10 h-8 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
                                                     <button onClick={(e) => { e.stopPropagation(); openEditPrize(prize); }} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="修改獎項"><Pencil size={16} /></button>
                                                 </div>
@@ -1288,6 +1288,53 @@
                     {/* Modals... (Same as before) */}
                     {/* Bonus, Edit, Admin Login, Admin Panel, Settings, Redraw Menu, Small Redraw Modal, Main Winner Modal */}
                     
+                    {/* NEW: Prize Winners List Modal */}
+                    {viewingPrizeWinners && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closePrizeWinners}>
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-pop border-4 border-blue-200 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4 border-b pb-4">
+                                    <h3 className="font-black text-2xl text-gray-800 flex items-center gap-2">
+                                        <Trophy className="text-yellow-500" />
+                                        {viewingPrizeWinners.name} 得獎名單
+                                    </h3>
+                                    <button onClick={closePrizeWinners} className="p-2 hover:bg-gray-100 rounded-full transition"><X size={20}/></button>
+                                </div>
+                                <div className="overflow-y-auto flex-1 custom-scrollbar">
+                                    {currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id).length > 0 ? (
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="text-gray-500 text-sm border-b">
+                                                    <th className="py-2 px-2">姓名</th>
+                                                    <th className="py-2 px-2">部門</th>
+                                                    <th className="py-2 px-2 text-right">時間</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {currentScene.history
+                                                    .filter(h => h.prizeId === viewingPrizeWinners.id)
+                                                    .map((record, idx) => (
+                                                        <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                                                            <td className="py-3 px-2 font-bold text-gray-800">{record.personName}</td>
+                                                            <td className="py-3 px-2 text-gray-500 text-sm">{record.personGroup || '-'}</td>
+                                                            <td className="py-3 px-2 text-right text-gray-400 text-xs font-mono">{record.time}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                                            <Users size={48} className="mb-2 opacity-20" />
+                                            <p>尚未抽出得主</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4 pt-4 border-t flex justify-end text-sm text-gray-500">
+                                    共 {currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id).length} 位得主
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Bonus Prize Modal */}
                     {showBonusModal && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowBonusModal(false)}>
@@ -1355,6 +1402,8 @@
                                             <input type="number" className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none" min="0" value={editingPrize.count} onChange={e => setEditingPrize({...editingPrize, count: e.target.value})} />
                                         </div>
                                     </div>
+                                    {/* Checkbox for Bonus Prize */}
+                                    {/* 移除手動勾選介面，避免混淆 */}
                                 </div>
                                 <div className="flex gap-3 mt-6">
                                     <button onClick={handleDeletePrize} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 transition">刪除</button>
@@ -1655,32 +1704,8 @@
                                     </div>
                                 </div>
                                 <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-                                    <button onClick={() => { setShowSettings(false); setShowRedrawMenu(true); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-pink-200 text-red-600 rounded-xl hover:bg-pink-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
+                                    <button onClick={() => { setShowSettings(false); handleRedrawClick(); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-pink-200 text-red-600 rounded-xl hover:bg-pink-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
                                     <button onClick={() => setShowSettings(false)} className="px-8 py-3 bg-gray-900 text-white rounded-xl hover:bg-black font-bold shadow-lg">完成設定</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Redraw Selection Menu */}
-                    {showRedrawMenu && (
-                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleRedrawCancel}>
-                            <div className="bg-white rounded-3xl p-8 max-w-4xl w-full text-center relative shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
-                                <h3 className="text-2xl font-black text-gray-800 mb-2 flex items-center justify-center gap-2"><RefreshCw className="text-red-500"/> 選擇重抽範圍</h3>
-                                <div className="flex justify-end mb-2">
-                                     <button onClick={selectAllRedrawGroups} className="text-sm font-bold text-red-500 hover:underline">{redrawSelectedGroups.size === Object.keys(groupedParticipants).length ? '取消全選' : '全選'}</button>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto overflow-x-hidden p-1 mb-6">
-                                    {Object.keys(groupedParticipants).map(groupName => (
-                                        <button key={groupName} onClick={() => toggleRedrawGroup(groupName)} className={`py-3 rounded-lg border-2 font-bold transition flex items-center justify-center gap-2 ${redrawSelectedGroups.has(groupName) ? 'bg-red-500 text-white border-red-500 shadow-md transform scale-105' : 'bg-white text-gray-500 border-red-100 hover:border-red-300'}`}>
-                                            {redrawSelectedGroups.has(groupName) && <CheckCircle size={16} />}
-                                            {groupName}
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => executeRedraw(redrawSelectedGroups)} className="flex-1 bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold hover:brightness-110 shadow-lg transition">開始重抽</button>
-                                    <button onClick={handleRedrawCancel} className="flex-1 bg-gray-200 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-300 transition">取消</button>
                                 </div>
                             </div>
                         </div>
@@ -1742,7 +1767,7 @@
 
                                             <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full max-w-2xl mt-auto">
                                                 <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下</button>
-                                                <button onClick={reopenRedrawMenu} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-8 md:h-8"/> 棄權重抽</button>
+                                                <button onClick={handleRetryRedraw} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-8 md:h-8"/> 棄權重抽</button>
                                             </div>
                                         </div>
                                     )}
