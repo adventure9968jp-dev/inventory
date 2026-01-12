@@ -773,13 +773,9 @@
                     setIsSpinning(false);
                     setLastWinner({ person: winner, prize: currentPrize });
                     
-                    // 5. Play Win Sound & Confetti IMMEDIATELY (No delay)
+                    // 5. Play Win Sound & Confetti IMMEDIATELY (Removed delay for continuity)
                     triggerConfetti(); 
-                    
-                    // 6. Show Modal after a short delay (for visual confirmation)
-                    setTimeout(() => {
-                        setShowWinnerModal(true);
-                    }, 800);
+                    setShowWinnerModal(true);
                 }, 3000); 
             }, [currentScene, currentPrize, visibleGroups]);
 
@@ -820,11 +816,6 @@
                 setShowRedrawModal(false); 
                 setHighlightId(null);
             }, [activeSceneId, lastWinner]);
-
-            // ... (Redraw logic) ...
-            
-            // Toggle Redraw Group is not needed with new logic
-            // Select All Redraw Groups is not needed with new logic
 
             const executeRedraw = useCallback((targetGroups) => {
                 if (!currentPrize || currentPrize.count <= 0) { alert("😱 這個獎項已經發完了！無法重抽。"); return; }
@@ -876,6 +867,8 @@
                     SoundManager.stopSpin();
                     
                     setHighlightId(winner.id); // Stop on winner
+                    
+                    // Removed delay for continuity
                     setRedrawDisplay(winner); 
                     setIsRedrawSpinning(false); 
                     triggerConfetti(); // Plays win sound
@@ -1093,7 +1086,6 @@
                     }
                     if (e.code === 'PageDown') {
                         e.preventDefault();
-                        // Removed showRedrawMenu check
                         if (showWinnerModal && lastWinner && !showRedrawModal) { handleRedrawClick(); return; } // Re-draw
                         if (showRedrawModal && !isRedrawSpinning) { handleRetryRedraw(); return; } // Retry redraw
                     }
@@ -1291,22 +1283,24 @@
                     {/* NEW: Prize Winners List Modal */}
                     {viewingPrizeWinners && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closePrizeWinners}>
-                            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-pop border-4 border-blue-200 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-4 border-b pb-4">
-                                    <h3 className="font-black text-2xl text-gray-800 flex items-center gap-2">
-                                        <Trophy className="text-yellow-500" />
+                            {/* Changed max-w-lg to max-w-[90vw] and added h-[85vh] for size */}
+                            <div className="bg-white rounded-3xl p-8 w-full max-w-[90vw] h-[85vh] shadow-2xl animate-pop border-4 border-blue-200 flex flex-col" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                    {/* Increased title size */}
+                                    <h3 className="font-black text-4xl text-gray-800 flex items-center gap-3">
+                                        <Trophy className="text-yellow-500 w-10 h-10" />
                                         {viewingPrizeWinners.name} 得獎名單
                                     </h3>
-                                    <button onClick={closePrizeWinners} className="p-2 hover:bg-gray-100 rounded-full transition"><X size={20}/></button>
+                                    <button onClick={closePrizeWinners} className="p-3 hover:bg-gray-100 rounded-full transition"><X size={32}/></button>
                                 </div>
                                 <div className="overflow-y-auto flex-1 custom-scrollbar">
                                     {currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id).length > 0 ? (
                                         <table className="w-full text-left border-collapse">
                                             <thead>
-                                                <tr className="text-gray-500 text-sm border-b">
-                                                    <th className="py-2 px-2">姓名</th>
-                                                    <th className="py-2 px-2">部門</th>
-                                                    <th className="py-2 px-2 text-right">時間</th>
+                                                <tr className="text-gray-500 text-xl border-b-2 border-gray-100">
+                                                    <th className="py-4 px-4">姓名</th>
+                                                    <th className="py-4 px-4">部門</th>
+                                                    <th className="py-4 px-4 text-right">時間</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1314,21 +1308,22 @@
                                                     .filter(h => h.prizeId === viewingPrizeWinners.id)
                                                     .map((record, idx) => (
                                                         <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                                                            <td className="py-3 px-2 font-bold text-gray-800">{record.personName}</td>
-                                                            <td className="py-3 px-2 text-gray-500 text-sm">{record.personGroup || '-'}</td>
-                                                            <td className="py-3 px-2 text-right text-gray-400 text-xs font-mono">{record.time}</td>
+                                                            {/* Increased content font sizes */}
+                                                            <td className="py-4 px-4 text-3xl font-black text-gray-800">{record.personName}</td>
+                                                            <td className="py-4 px-4 text-xl text-gray-600 font-bold">{record.personGroup || '-'}</td>
+                                                            <td className="py-4 px-4 text-right text-lg text-gray-400 font-mono">{record.time}</td>
                                                         </tr>
                                                     ))}
                                             </tbody>
                                         </table>
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                                            <Users size={48} className="mb-2 opacity-20" />
-                                            <p>尚未抽出得主</p>
+                                        <div className="flex flex-col items-center justify-center h-full text-gray-300">
+                                            <Users size={80} className="mb-4 opacity-20" />
+                                            <p className="text-2xl font-bold">尚未抽出得主</p>
                                         </div>
                                     )}
                                 </div>
-                                <div className="mt-4 pt-4 border-t flex justify-end text-sm text-gray-500">
+                                <div className="mt-6 pt-4 border-t flex justify-end text-xl font-bold text-gray-500">
                                     共 {currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id).length} 位得主
                                 </div>
                             </div>
@@ -1710,6 +1705,9 @@
                             </div>
                         </div>
                     )}
+
+                    {/* Redraw Selection Menu */}
+                    {/* (This section is intentionally removed as we are now doing direct redraw) */}
 
                     {/* Small Redraw Modal */}
                     {showRedrawModal && (
