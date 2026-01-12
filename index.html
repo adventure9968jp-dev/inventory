@@ -188,17 +188,16 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- Sound Manager (Updated for Custom Sounds) ---
+        // --- Sound Manager (Fixed & Consolidated) ---
         const SoundManager = {
             ctx: null,
             customSpinUrl: null,
             customWinUrl: null,
-            spinAudio: null, // 儲存轉動音效實例
-            winAudio: null,  // 儲存中獎音效實例
+            spinAudio: null, 
+            winAudio: null,
 
             init: function() {
                 if (!this.ctx) {
-                    // Initialize AudioContext
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     this.ctx = new AudioContext();
                 }
@@ -211,8 +210,8 @@
                 this.customSpinUrl = url;
                 if (url) {
                     this.spinAudio = new Audio(url);
-                    this.spinAudio.loop = true; // 設定循環播放
-                    this.spinAudio.volume = 0.6; // 轉動音效稍微小聲一點
+                    this.spinAudio.loop = true; 
+                    this.spinAudio.volume = 0.6; 
                 } else {
                     this.spinAudio = null;
                 }
@@ -228,26 +227,21 @@
                 }
             },
 
-            // Helper to play a simple tone
             playTone: function(freq, type, duration, startTime = 0, volume = 0.1) {
                 if (!this.ctx) return;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
-                
                 osc.type = type;
                 osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
-                
                 gain.gain.setValueAtTime(volume, this.ctx.currentTime + startTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
-                
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
-                
                 osc.start(this.ctx.currentTime + startTime);
                 osc.stop(this.ctx.currentTime + startTime + duration);
             },
 
-            // Start Spin Sound (Looping BG or nothing)
+            // Start continuous spin sound (loop)
             startSpin: function() {
                 this.init();
                 if (this.spinAudio) {
@@ -256,7 +250,7 @@
                 }
             },
 
-            // Stop Spin Sound (Called when winner found)
+            // Stop continuous spin sound
             stopSpin: function() {
                 if (this.spinAudio) {
                     this.spinAudio.pause();
@@ -264,14 +258,11 @@
                 }
             },
 
-            // Tick Sound (Called on each grid jump IF no custom spin sound)
+            // Play a single tick sound (for grid movement)
             tick: function() {
-                // If custom spin audio exists, we are playing it in a loop, so don't play ticks
-                if (this.spinAudio) return;
-
+                if (this.spinAudio) return; // Don't tick if custom loop is playing
                 this.init();
                 if (!this.ctx) return;
-                // Create a short, percussive sound
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.type = 'triangle';
@@ -285,27 +276,29 @@
                 osc.stop(this.ctx.currentTime + 0.08);
             },
 
-            // Win Sound
+            // Backward compatibility alias
+            spin: function() {
+                this.tick();
+            },
+
             win: function() {
                 this.init();
                 if (this.winAudio) {
-                    // 中獎音效通常較長，確保從頭播放
                     this.winAudio.currentTime = 0;
                     this.winAudio.play().catch(() => {});
                 } else {
                     if (!this.ctx) return;
-                    // C Major Chord: C5, E5, G5, C6
-                    this.playTone(523.25, 'sine', 0.4, 0, 0.15);      // C5
-                    this.playTone(659.25, 'sine', 0.4, 0.1, 0.15);    // E5
-                    this.playTone(783.99, 'sine', 0.4, 0.2, 0.15);    // G5
-                    this.playTone(1046.50, 'triangle', 0.8, 0.3, 0.2); // C6 (Stronger)
+                    this.playTone(523.25, 'sine', 0.4, 0, 0.15);      
+                    this.playTone(659.25, 'sine', 0.4, 0.1, 0.15);    
+                    this.playTone(783.99, 'sine', 0.4, 0.2, 0.15);    
+                    this.playTone(1046.50, 'triangle', 0.8, 0.3, 0.2); 
                 }
             },
-            // Confirm Sound
+
             confirm: function() {
                 this.init();
                 if (!this.ctx) return;
-                this.playTone(880, 'sine', 0.6, 0, 0.1); // A5
+                this.playTone(880, 'sine', 0.6, 0, 0.1); 
             }
         };
 
