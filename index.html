@@ -859,46 +859,51 @@
 
                 setCurrentRedrawTarget(targetGroups);
 
-                let candidates;
                 const isBonusDraw = currentPrize.isBonus;
                 
-                // For redraw, we usually only care about the eligible ones for spinning
-                // But for display, maybe we want to keep consistent?
-                // Let's assume redraw grid only shows eligible people to keep focus
-                
-                const filterFn = (p) => {
-                    const groupMatch = targetGroups.has(p.group || '未分類');
-                    if (isBonusDraw) return p.active && !p.bonusWon && groupMatch;
-                    else return p.active && !p.won && groupMatch;
-                };
+                // 1. Calculate Display Pool (All active participants in selected groups)
+                const displayPool = currentScene.participants.filter(p => 
+                    p.active && targetGroups.has(p.group || '未分類')
+                );
 
-                candidates = currentScene.participants.filter(filterFn);
+                // 2. Calculate Eligible Candidates (Actual pool to draw from)
+                const candidates = displayPool.filter(p => 
+                    isBonusDraw ? !p.bonusWon : !p.won
+                );
+
                 if (candidates.length === 0) { alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); return; }
                 
                 const winner = getWeightedWinner(candidates, currentPrize.id);
                 if (!winner) { alert("⚠️ 該群組所有候選人的權重皆為 0，無法抽出！"); return; }
 
-                setDrawPool(candidates); // Update draw pool for the redraw grid (Here we only show eligible for focus)
+                setDrawPool(displayPool); // Update draw pool for the redraw grid (Here we only show eligible for focus)
                 setShowRedrawMenu(false); 
                 setShowRedrawModal(true); 
                 setIsRedrawSpinning(true);
                 setHighlightId(null);
                 setLastWinner({ person: winner, prize: currentPrize });
+                
+                // 1. Start continuous spin sound
+                SoundManager.startSpin();
 
                 if (timerRef.current) clearInterval(timerRef.current);
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
                     setHighlightId(candidates[randomIdx].id); // Update highlight ID
                     setRedrawDisplay(candidates[randomIdx]); // Keep for text display if needed, but we use grid now
-                    SoundManager.spin();
+                    // 2. Play tick ONLY if no custom sound
+                    SoundManager.tick();
                 }, 50);
 
                 setTimeout(() => {
                     clearInterval(timerRef.current);
+                    // 3. Stop continuous spin sound
+                    SoundManager.stopSpin();
+                    
                     setHighlightId(winner.id); // Stop on winner
                     setRedrawDisplay(winner); 
                     setIsRedrawSpinning(false); 
-                    triggerConfetti();
+                    triggerConfetti(); // Plays win sound
                 }, 3000);
             }, [currentScene, currentPrize, visibleGroups]);
             
@@ -912,34 +917,8 @@
             const deleteParticipant = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.filter(p => p.id!==pId)} : s));
             const handleAddNames = () => { if(!newNameList.trim())return; const names=newNameList.split('\n').filter(n=>n.trim()); const g=newGroupName.trim()||'一般'; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:[...s.participants, ...names.map(n=>({id:Date.now()+Math.random(), name:n.trim(), group:g, active:true, won:false, bonusWon:false}))]}:s)); setVisibleGroups(prev=>new Set(prev).add(g)); setNewNameList(''); };
             const handleAdminLogin = () => { if(adminPasswordInput==='355053'){setShowAdminLogin(false);setAdminPasswordInput('');setLoginError(false);setAdminTargetPrizeId(currentScene.prizes[0]?.id);setShowAdminPanel(true);}else{setLoginError(true);} };
-            
-            // Updated updateWeight: Can update bonus prize weight for non-bonus winners
-            const updateWeight = (pid, w) => { 
-                if(!adminTargetPrizeId)return; 
-                setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, weights:{...s.weights, [adminTargetPrizeId]:{...(s.weights[adminTargetPrizeId]||{}), [pid]:w}}}:s)); 
-            };
-            
-            // Updated updateGroupWeights: Can update bonus prize weight for non-bonus winners
-            const updateGroupWeights = (ps, w) => { 
-                if(!adminTargetPrizeId)return; 
-                
-                // Find current target prize in the scene being updated (or currentScene since it's active)
-                const targetP = currentScene.prizes.find(pz => pz.id === adminTargetPrizeId);
-                const isBonus = targetP?.isBonus;
-
-                setScenes(prev=>prev.map(s=>{ 
-                    if(s.id!==activeSceneId)return s; 
-                    const newW={...s.weights}; 
-                    if(!newW[adminTargetPrizeId])newW[adminTargetPrizeId]={}; 
-                    ps.forEach(p=>{
-                        // Logic update:
-                        const alreadyWon = isBonus ? p.bonusWon : p.won;
-                        if(!alreadyWon) newW[adminTargetPrizeId][p.id]=w;
-                    }); 
-                    return {...s, weights:newW}; 
-                })); 
-            };
-            
+            const updateWeight = (pid, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, weights:{...s.weights, [adminTargetPrizeId]:{...(s.weights[adminTargetPrizeId]||{}), [pid]:w}}}:s)); };
+            const updateGroupWeights = (ps, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>{ if(s.id!==activeSceneId)return s; const newW={...s.weights}; if(!newW[adminTargetPrizeId])newW[adminTargetPrizeId]={}; ps.forEach(p=>{if(!p.won)newW[adminTargetPrizeId][p.id]=w;}); return {...s, weights:newW}; })); };
             const handleDragStart = (e, id) => { e.dataTransfer.setData("text/plain", id); e.target.classList.add("dragging"); };
             const handleDragEnd = (e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); };
             const handleDragOver = (e, g) => { e.preventDefault(); setDragOverGroup(g); };
@@ -1352,20 +1331,6 @@
                                             <input type="number" className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none" min="0" value={editingPrize.count} onChange={e => setEditingPrize({...editingPrize, count: e.target.value})} />
                                         </div>
                                     </div>
-                                    {/* Checkbox for Bonus Prize */}
-                                    <div className="flex items-center gap-2 mt-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
-                                        <input 
-                                            type="checkbox" 
-                                            id="edit-is-bonus" 
-                                            className="w-5 h-5 accent-orange-500 cursor-pointer"
-                                            checked={editingPrize.isBonus || false}
-                                            onChange={e => setEditingPrize({...editingPrize, isBonus: e.target.checked})}
-                                        />
-                                        <label htmlFor="edit-is-bonus" className="text-sm font-bold text-gray-700 cursor-pointer select-none">
-                                            設定為加碼獎項 (Bonus)
-                                            <span className="block text-xs text-gray-400 font-normal">全體復活，但已中加碼者除外</span>
-                                        </label>
-                                    </div>
                                 </div>
                                 <div className="flex gap-3 mt-6">
                                     <button onClick={handleDeletePrize} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 transition">刪除</button>
@@ -1715,15 +1680,19 @@
                                             {/* Show current draw pool */}
                                             {drawPool.map(p => {
                                                 const isHighlighted = p.id === highlightId;
+                                                const isWinner = currentPrize && currentPrize.isBonus ? p.bonusWon : p.won;
                                                 return (
                                                     <div 
                                                         key={p.id}
                                                         id={`redraw-cell-${p.id}`} // Change for redraw
                                                         className={`
                                                             aspect-square rounded-xl flex items-center justify-center p-1 shadow-sm transition-all duration-75 border-2
-                                                            ${isHighlighted 
-                                                                ? 'grid-cell-winner shadow-2xl border-yellow-500' 
-                                                                : 'grid-cell-normal border-red-300 opacity-90'}
+                                                            ${isWinner 
+                                                                ? 'grid-cell-already-won' // Black bg, white text
+                                                                : (isHighlighted 
+                                                                    ? 'grid-cell-winner shadow-2xl border-yellow-500' 
+                                                                    : 'grid-cell-normal border-red-300 opacity-90') 
+                                                            }
                                                         `}
                                                     >
                                                         {/* 修改：字體調整為與主畫面一致 text-sm md:text-base lg:text-lg */}
