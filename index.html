@@ -874,7 +874,8 @@
                 if (candidates.length === 0) { alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); return; }
                 
                 const winner = getWeightedWinner(candidates, currentPrize.id);
-                if (!winner) { alert("⚠️ 該群組所有候選人的權重皆為 0，無法抽出！"); return; }
+                // 修改：移除 alert，若無贏家(權重皆為0)則直接返回不動作
+                if (!winner) { return; }
 
                 setDrawPool(displayPool); // Update draw pool for the redraw grid (Here we only show eligible for focus)
                 setShowRedrawMenu(false); 
