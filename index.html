@@ -917,8 +917,31 @@
             const deleteParticipant = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.filter(p => p.id!==pId)} : s));
             const handleAddNames = () => { if(!newNameList.trim())return; const names=newNameList.split('\n').filter(n=>n.trim()); const g=newGroupName.trim()||'一般'; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:[...s.participants, ...names.map(n=>({id:Date.now()+Math.random(), name:n.trim(), group:g, active:true, won:false, bonusWon:false}))]}:s)); setVisibleGroups(prev=>new Set(prev).add(g)); setNewNameList(''); };
             const handleAdminLogin = () => { if(adminPasswordInput==='355053'){setShowAdminLogin(false);setAdminPasswordInput('');setLoginError(false);setAdminTargetPrizeId(currentScene.prizes[0]?.id);setShowAdminPanel(true);}else{setLoginError(true);} };
-            const updateWeight = (pid, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, weights:{...s.weights, [adminTargetPrizeId]:{...(s.weights[adminTargetPrizeId]||{}), [pid]:w}}}:s)); };
-            const updateGroupWeights = (ps, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>{ if(s.id!==activeSceneId)return s; const newW={...s.weights}; if(!newW[adminTargetPrizeId])newW[adminTargetPrizeId]={}; ps.forEach(p=>{if(!p.won)newW[adminTargetPrizeId][p.id]=w;}); return {...s, weights:newW}; })); };
+            
+            // Updated updateWeight: Can update bonus prize weight for non-bonus winners
+            const updateWeight = (pid, w) => { 
+                if(!adminTargetPrizeId)return; 
+                setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, weights:{...s.weights, [adminTargetPrizeId]:{...(s.weights[adminTargetPrizeId]||{}), [pid]:w}}}:s)); 
+            };
+            
+            // Updated updateGroupWeights: Remove condition to allow forcing state even for winners (visual consistency)
+            const updateGroupWeights = (ps, w) => { 
+                if(!adminTargetPrizeId)return; 
+                
+                setScenes(prev=>prev.map(s=>{ 
+                    if(s.id!==activeSceneId)return s; 
+                    const newW={...s.weights}; 
+                    if(!newW[adminTargetPrizeId])newW[adminTargetPrizeId]={}; 
+                    ps.forEach(p=>{
+                        // FIX: Remove the 'alreadyWon' check. 
+                        // Allow "Turn All On/Off" to update weight for EVERYONE in the group.
+                        // Eligibility is checked at draw time, so this is safe and allows easier bulk reset.
+                        newW[adminTargetPrizeId][p.id]=w;
+                    }); 
+                    return {...s, weights:newW}; 
+                })); 
+            };
+            
             const handleDragStart = (e, id) => { e.dataTransfer.setData("text/plain", id); e.target.classList.add("dragging"); };
             const handleDragEnd = (e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); };
             const handleDragOver = (e, g) => { e.preventDefault(); setDragOverGroup(g); };
