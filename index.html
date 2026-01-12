@@ -15,6 +15,8 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <!-- SheetJS (XLSX) for Excel Export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap');
@@ -186,20 +188,46 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- Sound Manager (Implemented with Web Audio API) ---
+        // --- Sound Manager (Updated for Custom Sounds) ---
         const SoundManager = {
             ctx: null,
+            customSpinUrl: null,
+            customWinUrl: null,
+            spinAudio: null, // 儲存轉動音效實例
+            winAudio: null,  // 儲存中獎音效實例
+
             init: function() {
                 if (!this.ctx) {
                     // Initialize AudioContext
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     this.ctx = new AudioContext();
                 }
-                // Resume if suspended (browser policy)
                 if (this.ctx.state === 'suspended') {
                     this.ctx.resume();
                 }
             },
+            
+            setCustomSpin: function(url) {
+                this.customSpinUrl = url;
+                if (url) {
+                    this.spinAudio = new Audio(url);
+                    this.spinAudio.loop = true; // 設定循環播放
+                    this.spinAudio.volume = 0.6; // 轉動音效稍微小聲一點
+                } else {
+                    this.spinAudio = null;
+                }
+            },
+
+            setCustomWin: function(url) {
+                this.customWinUrl = url;
+                if (url) {
+                    this.winAudio = new Audio(url);
+                    this.winAudio.volume = 1.0;
+                } else {
+                    this.winAudio = null;
+                }
+            },
+
             // Helper to play a simple tone
             playTone: function(freq, type, duration, startTime = 0, volume = 0.1) {
                 if (!this.ctx) return;
@@ -218,41 +246,62 @@
                 osc.start(this.ctx.currentTime + startTime);
                 osc.stop(this.ctx.currentTime + startTime + duration);
             },
-            // Spin Sound: Short, high-pitched "tick"
-            spin: function() {
+
+            // Start Spin Sound (Looping BG or nothing)
+            startSpin: function() {
+                this.init();
+                if (this.spinAudio) {
+                    this.spinAudio.currentTime = 0;
+                    this.spinAudio.play().catch(() => {});
+                }
+            },
+
+            // Stop Spin Sound (Called when winner found)
+            stopSpin: function() {
+                if (this.spinAudio) {
+                    this.spinAudio.pause();
+                    this.spinAudio.currentTime = 0;
+                }
+            },
+
+            // Tick Sound (Called on each grid jump IF no custom spin sound)
+            tick: function() {
+                // If custom spin audio exists, we are playing it in a loop, so don't play ticks
+                if (this.spinAudio) return;
+
                 this.init();
                 if (!this.ctx) return;
                 // Create a short, percussive sound
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
-                
                 osc.type = 'triangle';
-                // Slight random pitch for variation
                 const freq = 800 + Math.random() * 100;
                 osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                
-                // Short envelope
                 gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
-                
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
-                
                 osc.start();
                 osc.stop(this.ctx.currentTime + 0.08);
             },
-            // Win Sound: Fanfare (Major Chord Arpeggio)
+
+            // Win Sound
             win: function() {
                 this.init();
-                if (!this.ctx) return;
-                const now = this.ctx.currentTime;
-                // C Major Chord: C5, E5, G5, C6
-                this.playTone(523.25, 'sine', 0.4, 0, 0.15);      // C5
-                this.playTone(659.25, 'sine', 0.4, 0.1, 0.15);    // E5
-                this.playTone(783.99, 'sine', 0.4, 0.2, 0.15);    // G5
-                this.playTone(1046.50, 'triangle', 0.8, 0.3, 0.2); // C6 (Stronger)
+                if (this.winAudio) {
+                    // 中獎音效通常較長，確保從頭播放
+                    this.winAudio.currentTime = 0;
+                    this.winAudio.play().catch(() => {});
+                } else {
+                    if (!this.ctx) return;
+                    // C Major Chord: C5, E5, G5, C6
+                    this.playTone(523.25, 'sine', 0.4, 0, 0.15);      // C5
+                    this.playTone(659.25, 'sine', 0.4, 0.1, 0.15);    // E5
+                    this.playTone(783.99, 'sine', 0.4, 0.2, 0.15);    // G5
+                    this.playTone(1046.50, 'triangle', 0.8, 0.3, 0.2); // C6 (Stronger)
+                }
             },
-            // Confirm Sound: Simple "Ding"
+            // Confirm Sound
             confirm: function() {
                 this.init();
                 if (!this.ctx) return;
@@ -285,6 +334,8 @@
         const Coins = (props) => (<Icon {...props}><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m7.1 13.84.3-1.8" /></Icon>);
         const Pencil = (props) => (<Icon {...props}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></Icon>);
         const GripVertical = (props) => (<Icon {...props}><circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" /></Icon>);
+        const Volume2 = (props) => (<Icon {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></Icon>);
+        const Play = (props) => (<Icon {...props}><polygon points="5 3 19 12 5 21 5 3" /></Icon>);
 
         // 預設資料
         const DEFAULT_SCENES = [
@@ -416,6 +467,11 @@
             const [bonusName, setBonusName] = useState('加碼紅包');
             const [bonusAmount, setBonusAmount] = useState(1000);
             const [bonusCount, setBonusCount] = useState(1);
+
+            // Custom Sound States
+            const [customSoundNames, setCustomSoundNames] = useState({ spin: '', win: '' });
+            const spinSoundInputRef = useRef(null);
+            const winSoundInputRef = useRef(null);
 
             const timerRef = useRef(null);
             const fileInputRef = useRef(null); 
@@ -668,13 +724,15 @@
             const startDraw = useCallback(() => {
                 // Initialize audio context on user interaction
                 SoundManager.init();
+                // 1. Start continuous spin sound (if custom)
+                SoundManager.startSpin();
 
-                // 1. Calculate the VIEW pool (everyone visible)
+                // 2. Calculate the VIEW pool (everyone visible)
                 const visibleParticipants = currentScene.participants.filter(p => 
                     p.active && visibleGroups.has(p.group || '未分類')
                 );
 
-                // 2. Calculate the ELIGIBLE candidates (for winning)
+                // 3. Calculate the ELIGIBLE candidates (for winning)
                 // 加碼邏輯：如果是加碼獎項，檢查 bonusWon；如果是一般獎項，檢查 won
                 const eligibleCandidates = visibleParticipants.filter(p => 
                     currentPrize.isBonus ? !p.bonusWon : !p.won
@@ -697,12 +755,16 @@
                     // Randomly highlight ONLY eligible candidates
                     const randomIdx = Math.floor(Math.random() * eligibleCandidates.length);
                     setHighlightId(eligibleCandidates[randomIdx].id);
-                    SoundManager.spin();
+                    // Play tick ONLY if no custom sound is active (otherwise silence for BGM)
+                    SoundManager.tick(); 
                     counter++;
                 }, speed);
 
                 setTimeout(() => {
                     clearInterval(timerRef.current);
+                    // 4. Stop continuous spin sound immediately
+                    SoundManager.stopSpin();
+                    
                     const winner = getWeightedWinner(eligibleCandidates, currentPrize.id);
                     if (!winner) {
                         setIsSpinning(false);
@@ -713,8 +775,11 @@
                     setIsSpinning(false);
                     setLastWinner({ person: winner, prize: currentPrize });
                     
+                    // 5. Play Win Sound & Confetti IMMEDIATELY (No delay)
+                    triggerConfetti(); 
+                    
+                    // 6. Show Modal after a short delay (for visual confirmation)
                     setTimeout(() => {
-                        triggerConfetti();
                         setShowWinnerModal(true);
                     }, 800);
                 }, 3000); 
@@ -826,21 +891,28 @@
                 setIsRedrawSpinning(true);
                 setHighlightId(null);
                 setLastWinner({ person: winner, prize: currentPrize });
+                
+                // 1. Start continuous spin sound
+                SoundManager.startSpin();
 
                 if (timerRef.current) clearInterval(timerRef.current);
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
                     setHighlightId(candidates[randomIdx].id); // Update highlight ID
                     setRedrawDisplay(candidates[randomIdx]); // Keep for text display if needed, but we use grid now
-                    SoundManager.spin();
+                    // 2. Play tick ONLY if no custom sound
+                    SoundManager.tick();
                 }, 50);
 
                 setTimeout(() => {
                     clearInterval(timerRef.current);
+                    // 3. Stop continuous spin sound
+                    SoundManager.stopSpin();
+                    
                     setHighlightId(winner.id); // Stop on winner
                     setRedrawDisplay(winner); 
                     setIsRedrawSpinning(false); 
-                    triggerConfetti();
+                    triggerConfetti(); // Plays win sound
                 }, 3000);
             }, [currentScene, currentPrize, visibleGroups]);
             
@@ -861,8 +933,33 @@
             const handleDragOver = (e, g) => { e.preventDefault(); setDragOverGroup(g); };
             const handleDrop = (e, g) => { e.preventDefault(); setDragOverGroup(null); const id=Number(e.dataTransfer.getData("text/plain")); if(!id)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:s.participants.map(p=>p.id===id?{...p, group:g}:p)}:s)); };
             
+            // --- Custom Sound Logic ---
+            const handleSoundUpload = (type, event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const url = URL.createObjectURL(file);
+                if (type === 'spin') {
+                    SoundManager.setCustomSpin(url);
+                    setCustomSoundNames(prev => ({ ...prev, spin: file.name }));
+                } else {
+                    SoundManager.setCustomWin(url);
+                    setCustomSoundNames(prev => ({ ...prev, win: file.name }));
+                }
+            };
+
+            const handleResetSound = (type) => {
+                if (type === 'spin') {
+                    SoundManager.setCustomSpin(null);
+                    setCustomSoundNames(prev => ({ ...prev, spin: '' }));
+                    if (spinSoundInputRef.current) spinSoundInputRef.current.value = '';
+                } else {
+                    SoundManager.setCustomWin(null);
+                    setCustomSoundNames(prev => ({ ...prev, win: '' }));
+                    if (winSoundInputRef.current) winSoundInputRef.current.value = '';
+                }
+            };
+
             // --- New Drag & Drop Logic for Groups ---
-            
             const handleGroupDragStart = (e, groupName) => {
                 e.stopPropagation();
                 e.dataTransfer.setData("application/lucky-draw-group", groupName);
@@ -1242,6 +1339,20 @@
                                             <input type="number" className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none" min="0" value={editingPrize.count} onChange={e => setEditingPrize({...editingPrize, count: e.target.value})} />
                                         </div>
                                     </div>
+                                    {/* Checkbox for Bonus Prize */}
+                                    <div className="flex items-center gap-2 mt-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
+                                        <input 
+                                            type="checkbox" 
+                                            id="edit-is-bonus" 
+                                            className="w-5 h-5 accent-orange-500 cursor-pointer"
+                                            checked={editingPrize.isBonus || false}
+                                            onChange={e => setEditingPrize({...editingPrize, isBonus: e.target.checked})}
+                                        />
+                                        <label htmlFor="edit-is-bonus" className="text-sm font-bold text-gray-700 cursor-pointer select-none">
+                                            設定為加碼獎項 (Bonus)
+                                            <span className="block text-xs text-gray-400 font-normal">全體復活，但已中加碼者除外</span>
+                                        </label>
+                                    </div>
                                 </div>
                                 <div className="flex gap-3 mt-6">
                                     <button onClick={handleDeletePrize} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 transition">刪除</button>
@@ -1326,6 +1437,96 @@
                                     <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-200 rounded-full transition"><X/></button>
                                 </div>
                                 <div className="p-8 overflow-y-auto flex-1 space-y-8">
+                                    {/* Sound Settings Block */}
+                                    <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
+                                        <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Volume2 size={18}/> 音效設定</h3>
+                                        <div className="space-y-4">
+                                            {/* Spin Sound */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-gray-700">轉動音效</span>
+                                                    <span className="text-xs text-gray-400">建議使用短促音效 (如: 啵、叮)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input 
+                                                        type="file" 
+                                                        accept="audio/*" 
+                                                        ref={spinSoundInputRef}
+                                                        className="hidden"
+                                                        onChange={(e) => handleSoundUpload('spin', e)}
+                                                    />
+                                                    <span className="text-xs text-gray-500 font-medium mr-2 truncate max-w-[100px]">
+                                                        {customSoundNames.spin || "預設音效"}
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => spinSoundInputRef.current.click()} 
+                                                        className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-50 transition"
+                                                    >
+                                                        上傳
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => SoundManager.spin()} 
+                                                        className="bg-blue-100 text-blue-600 p-1.5 rounded-lg hover:bg-blue-200 transition"
+                                                        title="試聽"
+                                                    >
+                                                        <Play size={14} fill="currentColor" />
+                                                    </button>
+                                                    {customSoundNames.spin && (
+                                                        <button 
+                                                            onClick={() => handleResetSound('spin')}
+                                                            className="text-red-400 hover:text-red-600 p-1"
+                                                            title="重置"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Win Sound */}
+                                            <div className="flex items-center justify-between border-t border-gray-200 pt-4">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-gray-700">中獎音效</span>
+                                                    <span className="text-xs text-gray-400">中獎時播放的慶祝音效</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input 
+                                                        type="file" 
+                                                        accept="audio/*" 
+                                                        ref={winSoundInputRef}
+                                                        className="hidden"
+                                                        onChange={(e) => handleSoundUpload('win', e)}
+                                                    />
+                                                    <span className="text-xs text-gray-500 font-medium mr-2 truncate max-w-[100px]">
+                                                        {customSoundNames.win || "預設音效"}
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => winSoundInputRef.current.click()} 
+                                                        className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-50 transition"
+                                                    >
+                                                        上傳
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => SoundManager.win()} 
+                                                        className="bg-blue-100 text-blue-600 p-1.5 rounded-lg hover:bg-blue-200 transition"
+                                                        title="試聽"
+                                                    >
+                                                        <Play size={14} fill="currentColor" />
+                                                    </button>
+                                                    {customSoundNames.win && (
+                                                        <button 
+                                                            onClick={() => handleResetSound('win')}
+                                                            className="text-red-400 hover:text-red-600 p-1"
+                                                            title="重置"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
                                             <h3 className="font-bold text-gray-900 flex items-center gap-2"><Plus size={18}/> 快速新增人員</h3>
