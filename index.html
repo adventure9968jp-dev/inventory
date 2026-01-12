@@ -891,28 +891,21 @@
                 setIsRedrawSpinning(true);
                 setHighlightId(null);
                 setLastWinner({ person: winner, prize: currentPrize });
-                
-                // 1. Start continuous spin sound
-                SoundManager.startSpin();
 
                 if (timerRef.current) clearInterval(timerRef.current);
                 timerRef.current = setInterval(() => {
                     const randomIdx = Math.floor(Math.random() * candidates.length);
                     setHighlightId(candidates[randomIdx].id); // Update highlight ID
                     setRedrawDisplay(candidates[randomIdx]); // Keep for text display if needed, but we use grid now
-                    // 2. Play tick ONLY if no custom sound
-                    SoundManager.tick();
+                    SoundManager.spin();
                 }, 50);
 
                 setTimeout(() => {
                     clearInterval(timerRef.current);
-                    // 3. Stop continuous spin sound
-                    SoundManager.stopSpin();
-                    
                     setHighlightId(winner.id); // Stop on winner
                     setRedrawDisplay(winner); 
                     setIsRedrawSpinning(false); 
-                    triggerConfetti(); // Plays win sound
+                    triggerConfetti();
                 }, 3000);
             }, [currentScene, currentPrize, visibleGroups]);
             
@@ -926,14 +919,40 @@
             const deleteParticipant = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.filter(p => p.id!==pId)} : s));
             const handleAddNames = () => { if(!newNameList.trim())return; const names=newNameList.split('\n').filter(n=>n.trim()); const g=newGroupName.trim()||'一般'; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:[...s.participants, ...names.map(n=>({id:Date.now()+Math.random(), name:n.trim(), group:g, active:true, won:false, bonusWon:false}))]}:s)); setVisibleGroups(prev=>new Set(prev).add(g)); setNewNameList(''); };
             const handleAdminLogin = () => { if(adminPasswordInput==='355053'){setShowAdminLogin(false);setAdminPasswordInput('');setLoginError(false);setAdminTargetPrizeId(currentScene.prizes[0]?.id);setShowAdminPanel(true);}else{setLoginError(true);} };
-            const updateWeight = (pid, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, weights:{...s.weights, [adminTargetPrizeId]:{...(s.weights[adminTargetPrizeId]||{}), [pid]:w}}}:s)); };
-            const updateGroupWeights = (ps, w) => { if(!adminTargetPrizeId)return; setScenes(prev=>prev.map(s=>{ if(s.id!==activeSceneId)return s; const newW={...s.weights}; if(!newW[adminTargetPrizeId])newW[adminTargetPrizeId]={}; ps.forEach(p=>{if(!p.won)newW[adminTargetPrizeId][p.id]=w;}); return {...s, weights:newW}; })); };
+            
+            // Updated updateWeight: Can update bonus prize weight for non-bonus winners
+            const updateWeight = (pid, w) => { 
+                if(!adminTargetPrizeId)return; 
+                setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, weights:{...s.weights, [adminTargetPrizeId]:{...(s.weights[adminTargetPrizeId]||{}), [pid]:w}}}:s)); 
+            };
+            
+            // Updated updateGroupWeights: Can update bonus prize weight for non-bonus winners
+            const updateGroupWeights = (ps, w) => { 
+                if(!adminTargetPrizeId)return; 
+                
+                // Find current target prize in the scene being updated (or currentScene since it's active)
+                const targetP = currentScene.prizes.find(pz => pz.id === adminTargetPrizeId);
+                const isBonus = targetP?.isBonus;
+
+                setScenes(prev=>prev.map(s=>{ 
+                    if(s.id!==activeSceneId)return s; 
+                    const newW={...s.weights}; 
+                    if(!newW[adminTargetPrizeId])newW[adminTargetPrizeId]={}; 
+                    ps.forEach(p=>{
+                        // Logic update:
+                        const alreadyWon = isBonus ? p.bonusWon : p.won;
+                        if(!alreadyWon) newW[adminTargetPrizeId][p.id]=w;
+                    }); 
+                    return {...s, weights:newW}; 
+                })); 
+            };
+            
             const handleDragStart = (e, id) => { e.dataTransfer.setData("text/plain", id); e.target.classList.add("dragging"); };
             const handleDragEnd = (e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); };
             const handleDragOver = (e, g) => { e.preventDefault(); setDragOverGroup(g); };
             const handleDrop = (e, g) => { e.preventDefault(); setDragOverGroup(null); const id=Number(e.dataTransfer.getData("text/plain")); if(!id)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:s.participants.map(p=>p.id===id?{...p, group:g}:p)}:s)); };
             
-            // --- Custom Sound Logic ---
+            // --- Custom Sound Logic (Restored) ---
             const handleSoundUpload = (type, event) => {
                 const file = event.target.files[0];
                 if (!file) return;
@@ -960,6 +979,7 @@
             };
 
             // --- New Drag & Drop Logic for Groups ---
+            
             const handleGroupDragStart = (e, groupName) => {
                 e.stopPropagation();
                 e.dataTransfer.setData("application/lucky-draw-group", groupName);
@@ -1406,10 +1426,16 @@
                                                 {participants.map(p => {
                                                     const weight = currentScene.weights?.[adminTargetPrizeId]?.[p.id] !== undefined ? currentScene.weights[adminTargetPrizeId][p.id] : 1;
                                                     const isOn = weight > 0;
+                                                    
+                                                    // Determine exclusion based on prize type
+                                                    const targetPrizeInPanel = currentScene.prizes.find(p => p.id === adminTargetPrizeId);
+                                                    const isTargetBonus = targetPrizeInPanel?.isBonus;
+                                                    const isExcluded = isTargetBonus ? p.bonusWon : p.won;
+
                                                     return (
                                                         <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border-2 transition-colors ${isOn ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-200'}`}>
-                                                            <span className={`font-bold truncate mr-2 ${p.won ? 'text-gray-400 line-through' : (isOn ? 'text-gray-800' : 'text-gray-400')}`}>{p.name}</span>
-                                                            <button onClick={() => !p.won && updateWeight(p.id, isOn ? 0 : 1)} disabled={p.won} className={`relative w-16 h-8 rounded-full transition-all duration-300 shadow-inner flex items-center shrink-0 focus:outline-none ${isOn ? 'bg-green-500' : 'bg-gray-300'} ${p.won ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}`}>
+                                                            <span className={`font-bold truncate mr-2 ${isExcluded ? 'text-gray-400 line-through' : (isOn ? 'text-gray-800' : 'text-gray-400')}`}>{p.name}</span>
+                                                            <button onClick={() => !isExcluded && updateWeight(p.id, isOn ? 0 : 1)} disabled={isExcluded} className={`relative w-16 h-8 rounded-full transition-all duration-300 shadow-inner flex items-center shrink-0 focus:outline-none ${isOn ? 'bg-green-500' : 'bg-gray-300'} ${isExcluded ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}`}>
                                                                 <span className={`absolute left-2 text-[10px] font-black text-white transition-opacity ${isOn ? 'opacity-100' : 'opacity-0'}`}>ON</span>
                                                                 <span className={`absolute right-2 text-[10px] font-black text-gray-500 transition-opacity ${isOn ? 'opacity-0' : 'opacity-100'}`}>OFF</span>
                                                                 <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 absolute top-1 left-1 flex items-center justify-center ${isOn ? 'translate-x-8' : 'translate-x-0'}`}>
