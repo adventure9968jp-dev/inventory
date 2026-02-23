@@ -135,7 +135,6 @@
             background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
             border-color: #B45309;
             color: white;
-            /* transform: scale(1.1); 已移除縮放 */
             box-shadow: 0 0 40px rgba(245, 158, 11, 0.9);
             z-index: 20;
             animation: highlight 0.5s infinite;
@@ -148,7 +147,7 @@
             color: white;
         }
         
-        /* 已中獎者樣式 (黑底白字) */
+        /* 已中獎及棄權者樣式 (黑/灰底白字) */
         .grid-cell-already-won {
             background: #1f2937; /* Gray-800 */
             border-color: #000000;
@@ -156,9 +155,22 @@
             opacity: 0.8;
         }
 
+        /* 獎項名單專用自適應 CSS */
+        .winner-card {
+            container-type: inline-size;
+        }
+        .text-dynamic-group {
+            font-size: clamp(0.75rem, 10cqw, 2rem);
+            line-height: 1.2;
+        }
+        .text-dynamic-name {
+            font-size: clamp(1rem, 22cqw, 5rem);
+            line-height: 1.1;
+        }
+
         ::-webkit-scrollbar {
             width: 8px;
-            height: 8px; /* 增加水平捲軸高度設定 */
+            height: 8px;
         }
         ::-webkit-scrollbar-track {
             background: #ffe4e6;
@@ -169,7 +181,6 @@
             border-radius: 5px;
             border: 2px solid #ffe4e6;
         }
-        /* 隱藏捲軸角落的灰色方塊 */
         ::-webkit-scrollbar-corner {
             background: transparent;
         }
@@ -188,7 +199,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- Sound Manager (Fixed & Consolidated) ---
+        // --- Sound Manager ---
         const SoundManager = {
             ctx: null,
             customSpinUrl: null,
@@ -241,7 +252,6 @@
                 osc.stop(this.ctx.currentTime + startTime + duration);
             },
 
-            // Start continuous spin sound (loop)
             startSpin: function() {
                 this.init();
                 if (this.spinAudio) {
@@ -250,7 +260,6 @@
                 }
             },
 
-            // Stop continuous spin sound
             stopSpin: function() {
                 if (this.spinAudio) {
                     this.spinAudio.pause();
@@ -258,9 +267,8 @@
                 }
             },
 
-            // Play a single tick sound (for grid movement)
             tick: function() {
-                if (this.spinAudio) return; // Don't tick if custom loop is playing
+                if (this.spinAudio) return; 
                 this.init();
                 if (!this.ctx) return;
                 const osc = this.ctx.createOscillator();
@@ -276,11 +284,6 @@
                 osc.stop(this.ctx.currentTime + 0.08);
             },
 
-            // Backward compatibility alias
-            spin: function() {
-                this.tick();
-            },
-
             win: function() {
                 this.init();
                 if (this.winAudio) {
@@ -288,7 +291,7 @@
                     this.winAudio.play().catch(() => {});
                 } else {
                     if (!this.ctx) return;
-                    this.playTone(523.25, 'sine', 0.4, 0, 0.15);       
+                    this.playTone(523.25, 'sine', 0.4, 0, 0.15);      
                     this.playTone(659.25, 'sine', 0.4, 0.1, 0.15);     
                     this.playTone(783.99, 'sine', 0.4, 0.2, 0.15);     
                     this.playTone(1046.50, 'triangle', 0.8, 0.3, 0.2); 
@@ -306,14 +309,12 @@
         const Icon = ({ children, className, size = 24, ...props }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
         );
-        const Clover = (props) => (<Icon {...props}><path d="M16.2 7.8 16.7 5.3a2 2 0 0 0-3.5-1.5L12 6.1 10.8 3.8a2 2 0 0 0-3.5 1.5l.5 2.5-2.5-.5a2 2 0 0 0-1.5 3.5l2.3 1.2-2.3 1.2a2 2 0 0 0 1.5 3.5l2.5-.5-.5 2.5a2 2 0 0 0 3.5 1.5l1.2-2.3 1.2 2.3a2 2 0 0 0 3.5-1.5l-.5-2.5 2.5.5a2 2 0 0 0 1.5-3.5l-2.3-1.2 2.3-1.2a2 2 0 0 0-1.5-3.5z" /><path d="M12 18v4" /></Icon>);
         const Plus = (props) => (<Icon {...props}><path d="M5 12h14" /><path d="M12 5v14" /></Icon>);
         const X = (props) => (<Icon {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Icon>);
         const Settings = (props) => (<Icon {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Icon>);
         const Gift = (props) => (<Icon {...props}><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></Icon>);
         const Trophy = (props) => (<Icon {...props}><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></Icon>);
         const Users = (props) => (<Icon {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></Icon>);
-        const RefreshCw = (props) => (<Icon {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></Icon>);
         const CheckCircle = (props) => (<Icon {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" /></Icon>);
         const Trash2 = (props) => (<Icon {...props}><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></Icon>);
         const Building = (props) => (<Icon {...props}><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" /><path d="M8 14h.01" /><path d="M16 14h.01" /></Icon>);
@@ -330,7 +331,7 @@
         const Volume2 = (props) => (<Icon {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></Icon>);
         const Play = (props) => (<Icon {...props}><polygon points="5 3 19 12 5 21 5 3" /></Icon>);
         const UserList = (props) => (<Icon {...props}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M8 14h.01" /><path d="M12 14h.01" /><path d="M16 14h.01" /><path d="M8 18h.01" /><path d="M12 18h.01" /><path d="M16 18h.01" /></Icon>);
-        const AlertOctagon = (props) => (<Icon {...props}><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>);
+        const CheckSquare = (props) => (<Icon {...props}><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></Icon>);
 
         // 預設資料
         const DEFAULT_SCENES = [
@@ -338,12 +339,12 @@
                 id: 'scene-1',
                 title: '部門聚餐',
                 participants: [
-                    { id: 1, name: '小明', group: '業務部', active: true, won: false, bonusWon: false },
-                    { id: 2, name: '小華', group: '業務部', active: true, won: false, bonusWon: false },
-                    { id: 3, name: '美美', group: '行銷部', active: true, won: false, bonusWon: false },
-                    { id: 4, name: '大壯', group: '工程部', active: true, won: false, bonusWon: false },
-                    { id: 5, name: '阿強', group: '工程部', active: true, won: false, bonusWon: false },
-                    { id: 6, name: '老闆', group: '管理層', active: false, won: false, bonusWon: false },
+                    { id: 1, name: '小明', group: '業務部', active: true, won: false, bonusWon: false, forfeited: false },
+                    { id: 2, name: '小華', group: '業務部', active: true, won: false, bonusWon: false, forfeited: false },
+                    { id: 3, name: '美美', group: '行銷部', active: true, won: false, bonusWon: false, forfeited: false },
+                    { id: 4, name: '大壯', group: '工程部', active: true, won: false, bonusWon: false, forfeited: false },
+                    { id: 5, name: '阿強', group: '工程部', active: true, won: false, bonusWon: false, forfeited: false },
+                    { id: 6, name: '老闆', group: '管理層', active: false, won: false, bonusWon: false, forfeited: false },
                 ],
                 prizes: [
                     { id: 1, name: '現金 $1000', count: 3, value: 1000, isBonus: false },
@@ -351,22 +352,22 @@
                 ],
                 history: [],
                 weights: {},
-                consolationPrizeId: null // 新增：參加獎 ID
+                forfeitTargetId: null // 紀錄自動扣除的目標獎項 ID
             },
             {
                 id: 'scene-2',
                 title: '年終尾牙',
                 participants: [
-                    { id: 1, name: '工程師A', group: '研發處', active: true, won: false, bonusWon: false },
-                    { id: 2, name: '設計師B', group: '設計處', active: true, won: false, bonusWon: false },
-                    { id: 3, name: 'PM C', group: '產品處', active: true, won: false, bonusWon: false },
+                    { id: 1, name: '工程師A', group: '研發處', active: true, won: false, bonusWon: false, forfeited: false },
+                    { id: 2, name: '設計師B', group: '設計處', active: true, won: false, bonusWon: false, forfeited: false },
+                    { id: 3, name: 'PM C', group: '產品處', active: true, won: false, bonusWon: false, forfeited: false },
                 ],
                 prizes: [
                     { id: 1, name: 'iPhone 15', count: 1, value: 29900, isBonus: false },
                 ],
                 history: [],
                 weights: {},
-                consolationPrizeId: null
+                forfeitTargetId: null
             }
         ];
 
@@ -378,6 +379,14 @@
             });
             
             const scenes = history.present;
+            const [toastMsg, setToastMsg] = useState('');
+
+            useEffect(() => {
+                if (toastMsg) {
+                    const timer = setTimeout(() => setToastMsg(''), 3000);
+                    return () => clearTimeout(timer);
+                }
+            }, [toastMsg]);
 
             const setScenes = (newScenesOrFn) => {
                 setHistory(curr => {
@@ -425,29 +434,20 @@
             const [isSpinning, setIsSpinning] = useState(false);
             
             // 用於 Grid 顯示的變數
-            const [drawPool, setDrawPool] = useState([]); // 參與當次抽獎的池子 (僅視覺快照)
-            const [highlightId, setHighlightId] = useState(null); // 目前跳到誰
+            const [drawPool, setDrawPool] = useState([]); 
+            const [highlightId, setHighlightId] = useState(null); 
 
             const [showSettings, setShowSettings] = useState(false);
             const [showWinnerModal, setShowWinnerModal] = useState(false);
             const [lastWinner, setLastWinner] = useState(null);
             const [selectedPrizeId, setSelectedPrizeId] = useState(null);
-
-            // Removed showRedrawMenu
-            const [showRedrawModal, setShowRedrawModal] = useState(false);
-            const [isRedrawSpinning, setIsRedrawSpinning] = useState(false);
-            
-            // For Redraw Modal result display (just name string or object)
-            const [redrawDisplay, setRedrawDisplay] = useState(null);
-            
-            const [currentRedrawTarget, setCurrentRedrawTarget] = useState(null);
             
             const [newNameList, setNewNameList] = useState('');
             const [newGroupName, setNewGroupName] = useState('一般'); 
             const [newPrizeName, setNewPrizeName] = useState('');
             const [newPrizeCount, setNewPrizeCount] = useState(1);
             const [newPrizeValue, setNewPrizeValue] = useState(0); 
-            
+
             const [dragOverGroup, setDragOverGroup] = useState(null);
             const [visibleGroups, setVisibleGroups] = useState(new Set()); 
 
@@ -465,22 +465,20 @@
 
             // Prize Winner List Modal State
             const [viewingPrizeWinners, setViewingPrizeWinners] = useState(null);
+            
+            // 棄權選擇模式
+            const [isForfeitMode, setIsForfeitMode] = useState(false);
+            const [selectedForfeitIds, setSelectedForfeitIds] = useState(new Set());
 
-            // New State for Forfeit Confirmation
-            const [showForfeitConfirm, setShowForfeitConfirm] = useState(false);
-
-            // Custom Sound States (Updated to store Base64 data for export)
-            const [customSounds, setCustomSounds] = useState({ spin: null, win: null });
+            // Custom Sound States
+            const [customSoundNames, setCustomSoundNames] = useState({ spin: '', win: '' });
             const spinSoundInputRef = useRef(null);
             const winSoundInputRef = useRef(null);
 
             const timerRef = useRef(null);
             const fileInputRef = useRef(null); 
             const participantsInputRef = useRef(null); 
-            
-            // NEW REFS
             const mainGridRef = useRef(null);
-            const redrawGridRef = useRef(null);
 
             const currentScene = scenes.find(s => s.id === activeSceneId) || scenes[0];
 
@@ -491,10 +489,9 @@
                 setVisibleGroups(groups);
             }, [activeSceneId, currentScene.participants.length]); 
 
-            // Scroll effect for Grid Animation (Enhanced & Fixed for Jumping)
+            // Scroll effect for Grid Animation
             useEffect(() => {
                 if (highlightId) {
-                    // Helper to scroll specific container without moving window
                     const scrollToCenter = (container, elementId) => {
                         if (!container) return false;
                         const element = document.getElementById(elementId);
@@ -503,35 +500,25 @@
                         const containerRect = container.getBoundingClientRect();
                         const elementRect = element.getBoundingClientRect();
                         
-                        // Calculate offset from container top
                         const relativeTop = elementRect.top - containerRect.top;
-                        
-                        // Target scrollTop = Current scrollTop + relativeTop - (containerHeight/2) + (elementHeight/2)
                         const targetScroll = container.scrollTop + relativeTop - (container.clientHeight / 2) + (element.clientHeight / 2);
                         
                         container.scrollTop = targetScroll;
                         return true;
                     };
 
-                    // 1. Try Redraw Modal
-                    if (showRedrawModal && redrawGridRef.current) {
-                        const found = scrollToCenter(redrawGridRef.current, `redraw-cell-${highlightId}`);
-                        if (found) return;
-                    }
-
-                    // 2. Main Grid
                     if (mainGridRef.current) {
                         scrollToCenter(mainGridRef.current, `cell-${highlightId}`);
                     }
                 }
-            }, [highlightId, showRedrawModal]);
+            }, [highlightId]);
 
             const currentPrize = useMemo(() => {
-                if (selectedPrizeId) {
+                if (selectedPrizeId && selectedPrizeId !== 'forfeit') {
                     const p = currentScene.prizes.find(p => p.id === selectedPrizeId);
                     if (p) return p;
                 }
-                return currentScene.prizes.find(p => p.count > 0) || currentScene.prizes[0];
+                return currentScene.prizes.find(p => p.count > 0 && p.id !== 'forfeit') || currentScene.prizes.find(p => p.id !== 'forfeit') || currentScene.prizes[0];
             }, [currentScene.prizes, selectedPrizeId]);
 
             const groupedParticipants = useMemo(() => {
@@ -545,20 +532,21 @@
             }, [currentScene.participants]);
 
             const gridCandidates = useMemo(() => {
-                if (isSpinning || showWinnerModal || showRedrawModal) return drawPool;
+                if (isSpinning || showWinnerModal) return drawPool;
                 
                 return currentScene.participants.filter(p => 
                     p.active && 
                     visibleGroups.has(p.group || '未分類')
                 );
-            }, [currentScene, visibleGroups, isSpinning, showWinnerModal, showRedrawModal, drawPool]);
+            }, [currentScene, visibleGroups, isSpinning, showWinnerModal, drawPool]);
 
             const totalWonValue = useMemo(() => {
                 return currentScene.history.reduce((acc, curr) => acc + (curr.prizeValue || 0), 0);
             }, [currentScene.history]);
 
             const totalAmount = useMemo(() => {
-                const remaining = currentScene.prizes.reduce((acc, curr) => acc + (curr.count * (curr.value || 0)), 0);
+                // 不包含名為棄權的獎項在「原本預估」內的價值
+                const remaining = currentScene.prizes.reduce((acc, curr) => curr.id !== 'forfeit' ? acc + (curr.count * (curr.value || 0)) : acc, 0);
                 return remaining + totalWonValue;
             }, [currentScene.prizes, totalWonValue]);
 
@@ -579,13 +567,7 @@
             };
 
             const handleExport = () => {
-                // 將名單場景與音效打包在一起匯出，加上 version 標記以便未來相容
-                const exportData = {
-                    version: 2,
-                    scenes: scenes,
-                    sounds: customSounds
-                };
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(scenes));
                 const downloadAnchorNode = document.createElement('a');
                 downloadAnchorNode.setAttribute("href", dataStr);
                 downloadAnchorNode.setAttribute("download", "lucky_draw_backup.json");
@@ -601,32 +583,14 @@
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
-                        const importedData = JSON.parse(e.target.result);
-                        let importedScenes = [];
-
-                        // 判斷是否為新版 (包含音效) 或舊版 (純陣列)
-                        if (Array.isArray(importedData)) {
-                            importedScenes = importedData; // 舊版相容
-                        } else if (importedData.version === 2) {
-                            importedScenes = importedData.scenes; // 新版
-                            if (importedData.sounds) {
-                                setCustomSounds(importedData.sounds);
-                                // 重新將 Base64 音效載入 Audio 引擎
-                                if (importedData.sounds.spin?.data) SoundManager.setCustomSpin(importedData.sounds.spin.data);
-                                if (importedData.sounds.win?.data) SoundManager.setCustomWin(importedData.sounds.win.data);
-                            }
-                        } else {
-                            alert("❌ 檔案格式錯誤。");
-                            return;
-                        }
-
+                        const importedScenes = JSON.parse(e.target.result);
                         if (Array.isArray(importedScenes)) {
                             const safeScenes = importedScenes.map(s => ({ ...s, weights: s.weights || {} }));
                             setScenes(safeScenes);
                             if (!safeScenes.find(s => s.id === activeSceneId)) setActiveSceneId(safeScenes[0]?.id || 'scene-1');
-                            alert("✅ 資料匯入成功！");
-                        } else { alert("❌ 檔案內容不正確。"); }
-                    } catch (error) { alert("❌ 匯入失敗，檔案可能損毀。"); console.error(error); }
+                            setToastMsg("✅ 資料匯入成功！");
+                        } else { setToastMsg("❌ 檔案格式錯誤。"); }
+                    } catch (error) { setToastMsg("❌ 匯入失敗。"); }
                 };
                 reader.readAsText(fileObj);
                 event.target.value = null;
@@ -662,7 +626,7 @@
                             const name = parts[0]?.trim();
                             const group = parts[1]?.trim() || '一般';
                             if (name) {
-                                newParticipants.push({ id: Date.now() + Math.random() + i, name: name, group: group, active: true, won: false, bonusWon: false });
+                                newParticipants.push({ id: Date.now() + Math.random() + i, name: name, group: group, active: true, won: false, bonusWon: false, forfeited: false });
                                 newGroups.add(group);
                             }
                         }
@@ -673,41 +637,51 @@
                             return { ...scene, participants: [...scene.participants, ...newParticipants] };
                         }));
                         setVisibleGroups(newGroups);
-                        alert(`✅ 成功匯入 ${newParticipants.length} 筆名單！`);
-                    } else { alert("⚠️ 檔案中似乎沒有有效資料，請檢查格式。"); }
+                        setToastMsg(`✅ 成功匯入 ${newParticipants.length} 筆名單！`);
+                    } else { setToastMsg("⚠️ 檔案中似乎沒有有效資料，請檢查格式。"); }
                 };
                 reader.readAsText(file);
                 event.target.value = null;
             };
 
             const handleExportWinnersXlsx = () => {
-                if (currentScene.history.length === 0) { alert("⚠️ 目前還沒有中獎紀錄可以匯出喔！"); return; }
+                if (currentScene.history.length === 0) { setToastMsg("⚠️ 目前還沒有中獎紀錄可以匯出喔！"); return; }
                 try {
                     const wb = XLSX.utils.book_new();
                     const allWinnersData = [["獎項名稱", "得獎者", "部門", "中獎時間", "價值"]];
                     let grandTotal = 0;
                     const sortedHistory = [...currentScene.history].reverse();
-                    sortedHistory.forEach(h => { const val = parseInt(h.prizeValue) || 0; grandTotal += val; allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time, val]); });
+                    sortedHistory.forEach(h => { 
+                        const val = parseInt(h.prizeValue) || 0; 
+                        grandTotal += val; 
+                        // 棄權不顯示金額於清單上
+                        allWinnersData.push([h.prizeName, h.personName, h.personGroup || '', h.time, h.isForfeit ? '-' : val]); 
+                    });
                     allWinnersData.push([]); allWinnersData.push(["", "", "", "總計金額", grandTotal]);
                     const wsAll = XLSX.utils.aoa_to_sheet(allWinnersData);
                     wsAll['!cols'] = [{wch: 20}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 15}];
                     XLSX.utils.book_append_sheet(wb, wsAll, "總覽");
+                    
                     const prizesInHistory = [...new Set(currentScene.history.map(h => h.prizeName))];
                     prizesInHistory.forEach(prizeName => {
                         const winners = currentScene.history.filter(h => h.prizeName === prizeName);
-                        const sheetData = [["項次", "姓名", "中獎金額", "領獎簽收", "非榮實人員身分證字號", "非榮實人員戶籍地址"]];
+                        const sheetData = [["項次", "姓名", "中獎金額", "領獎簽收", "非榮實人員身分證字號", "非榮實人員戶籍地址", "中獎時間"]];
                         let prizeTotal = 0;
-                        winners.forEach((w, index) => { const val = parseInt(w.prizeValue) || 0; prizeTotal += val; sheetData.push([index + 1, w.personName, val, "", "", ""]); });
-                        sheetData.push([]); sheetData.push(["", "本頁總計", prizeTotal, "", "", ""]);
+                        winners.forEach((w, index) => { 
+                            const val = parseInt(w.prizeValue) || 0; 
+                            prizeTotal += val; 
+                            sheetData.push([index + 1, w.personName, w.isForfeit ? '-' : val, "", "", "", w.time]); 
+                        });
+                        sheetData.push([]); sheetData.push(["", "本頁總計", prizeTotal, "", "", "", ""]);
                         const ws = XLSX.utils.aoa_to_sheet(sheetData);
-                        ws['!cols'] = [{wch: 8}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 25}, {wch: 40}];
+                        ws['!cols'] = [{wch: 8}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 25}, {wch: 40}, {wch: 20}];
                         const safeName = prizeName.replace(/[\\/?*\[\]]/g, '').substring(0, 30);
                         let sheetName = safeName; let counter = 1;
                         while (wb.SheetNames.includes(sheetName)) { sheetName = `${safeName.substring(0, 28)}_${counter}`; counter++; }
                         XLSX.utils.book_append_sheet(wb, ws, sheetName);
                     });
                     XLSX.writeFile(wb, `${currentScene.title}_中獎名單.xlsx`);
-                } catch (error) { console.error("Export Error:", error); alert("匯出失敗。"); }
+                } catch (error) { console.error("Export Error:", error); setToastMsg("匯出失敗。"); }
             };
 
             const triggerConfetti = () => {
@@ -752,18 +726,18 @@
                     p.active && visibleGroups.has(p.group || '未分類')
                 );
 
+                // 被標記為棄權(forfeited: true)的人也喪失抽獎資格
                 const eligibleCandidates = visibleParticipants.filter(p => 
-                    currentPrize.isBonus ? !p.bonusWon : !p.won
+                    currentPrize.isBonus ? (!p.bonusWon && !p.forfeited) : (!p.won && !p.forfeited)
                 );
                 
-                if (!currentPrize) { alert("😱 目前沒有獎項！"); return; }
-                if (currentPrize.count <= 0) { alert("😱 這個獎項已經抽完了！請選擇其他獎項。"); return; }
-                if (eligibleCandidates.length === 0) { alert("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
+                if (!currentPrize) { setToastMsg("😱 目前沒有獎項！"); return; }
+                if (currentPrize.count <= 0) { setToastMsg("😱 這個獎項已經抽完了！請選擇其他獎項。"); return; }
+                if (eligibleCandidates.length === 0) { setToastMsg("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
 
                 setDrawPool(visibleParticipants); 
                 setIsSpinning(true);
                 setShowWinnerModal(false);
-                setShowForfeitConfirm(false); // Reset this
                 setHighlightId(null);
                 
                 let counter = 0;
@@ -783,7 +757,7 @@
                     const winner = getWeightedWinner(eligibleCandidates, currentPrize.id);
                     if (!winner) {
                         setIsSpinning(false);
-                        alert("⚠️ 所有候選人的中獎機率皆為 0，無法抽出得主！");
+                        setToastMsg("⚠️ 所有候選人的中獎機率皆為 0，無法抽出得主！");
                         return;
                     }
                     setHighlightId(winner.id);
@@ -819,151 +793,238 @@
                         p.id === prize.id ? { ...p, count: p.count - 1 } : p
                     );
                     const newHistory = [{
+                        recordId: Date.now() + Math.random(), // 加入獨立ID以供後續修改
                         time: new Date().toLocaleTimeString('en-US', {hour12: false, hour: "numeric", minute: "numeric", second: "numeric"}),
                         personName: winner.name, 
                         personGroup: winner.group, 
                         prizeName: prize.name,
                         prizeId: prize.id, 
-                        prizeValue: prize.value || 0
+                        prizeValue: prize.value || 0,
+                        isForfeit: false
                     }, ...scene.history];
                     return { ...scene, participants: updatedParticipants, prizes: updatedPrizes, history: newHistory };
                 }));
                 setShowWinnerModal(false);
-                setShowRedrawModal(false); 
                 setHighlightId(null);
             }, [activeSceneId, lastWinner]);
 
-            // Forfeit Logic
-            const confirmForfeit = useCallback(() => {
-                // Get consolation prize
-                const consolationPrize = currentScene.prizes.find(p => p.id === currentScene.consolationPrizeId);
+            // 抽獎當下按下棄權
+            const handleForfeitDraw = useCallback(() => {
+                if (!lastWinner?.person) return;
                 
-                // If no consolation prize is set, we still mark them as won (forfeited) effectively removing them from pool,
-                // but we warn the user if they care. For now, we proceed to ensure they are "removed".
-                // Ideally, user should set it.
-                if (!consolationPrize) {
-                    if (!confirm("尚未在設定中指定「參加獎」，若棄權將不發放任何獎項但標記為已中獎 (從抽獎池移除)。是否繼續？")) {
-                        return;
-                    }
+                const targetPrizeId = parseInt(currentScene.forfeitTargetId);
+                if (!targetPrizeId) {
+                    setToastMsg("⚠️ 請先至「設定」中選擇「棄權扣除項目」！");
+                    return;
+                }
+                const targetPrize = currentScene.prizes.find(p => p.id === targetPrizeId);
+                if (!targetPrize || targetPrize.count <= 0) {
+                    setToastMsg("⚠️ 設定的棄權扣除項目已無剩餘數量！");
+                    return;
                 }
 
-                const { person: winner } = lastWinner; 
-
+                const { person, prize: drawnPrize } = lastWinner;
+                
                 setScenes(prev => prev.map(scene => {
                     if (scene.id !== activeSceneId) return scene;
-
-                    // 1. Mark person as won
+                    
+                    // 被抽到的人喪失資格
                     const updatedParticipants = scene.participants.map(p => {
-                        if (p.id === winner.id) {
-                            return { ...p, won: true };
+                        if (p.id === person.id) {
+                            return { ...p, forfeited: true }; // 標記為棄權，之後不會再被抽到，畫面顯示灰底白字
                         }
                         return p;
                     });
 
-                    // 2. Decrement Consolation Prize count if it exists
-                    let updatedPrizes = scene.prizes;
-                    if (consolationPrize) {
-                        updatedPrizes = scene.prizes.map(p =>
-                            p.id === consolationPrize.id ? { ...p, count: p.count - 1 } : p
-                        );
+                    // 確保有「棄權」這個獎項，扣除目標項目數量，增加棄權數量
+                    let forfeitPrize = scene.prizes.find(p => p.id === 'forfeit');
+                    let updatedPrizes = [...scene.prizes];
+                    if (!forfeitPrize) {
+                        forfeitPrize = { id: 'forfeit', name: '棄權', count: 0, value: 0, isBonus: false };
+                        updatedPrizes.push(forfeitPrize);
                     }
-
-                    // 3. Add history
+                    updatedPrizes = updatedPrizes.map(p => {
+                        if (p.id === targetPrizeId) return { ...p, count: p.count - 1 };
+                        if (p.id === 'forfeit') return { ...p, count: p.count + 1 };
+                        return p;
+                    });
+                    
+                    // 記錄到歷史中
                     const newHistory = [{
+                        recordId: Date.now() + Math.random(),
                         time: new Date().toLocaleTimeString('en-US', {hour12: false, hour: "numeric", minute: "numeric", second: "numeric"}),
-                        personName: winner.name,
-                        personGroup: winner.group,
-                        prizeName: consolationPrize ? `${consolationPrize.name} (棄權轉領)` : "棄權 (無獎項)",
-                        prizeId: consolationPrize ? consolationPrize.id : -1,
-                        prizeValue: consolationPrize ? (consolationPrize.value || 0) : 0
+                        personName: person.name, 
+                        personGroup: person.group, 
+                        prizeName: '棄權',
+                        originalPrizeName: drawnPrize.name, // 原本抽到的獎
+                        deductedPrizeId: targetPrize.id, // 記錄實際扣掉哪一個獎
+                        deductedPrizeName: targetPrize.name, 
+                        prizeId: 'forfeit', 
+                        prizeValue: targetPrize.value || 0, // 使用被扣除獎項的價值
+                        isForfeit: true
                     }, ...scene.history];
 
                     return { ...scene, participants: updatedParticipants, prizes: updatedPrizes, history: newHistory };
                 }));
-
-                setShowForfeitConfirm(false);
                 setShowWinnerModal(false);
-                setShowRedrawModal(false);
                 setHighlightId(null);
+                setToastMsg(`已標記棄權，並自動扣除「${targetPrize.name}」1個名額`);
             }, [activeSceneId, lastWinner, currentScene]);
 
-            const executeRedraw = useCallback((targetGroups) => {
-                if (!currentPrize || currentPrize.count <= 0) { alert("😱 這個獎項已經發完了！無法重抽。"); return; }
-                
-                setCurrentRedrawTarget(targetGroups);
+            // 取消棄權 (復原) - 完全復原為白名單，不回到原本抽到的獎項，只退還預扣項目
+            const handleCancelForfeit = (record) => {
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
 
-                const isBonusDraw = currentPrize.isBonus;
-                
-                // 1. Calculate Display Pool
-                const displayPool = currentScene.participants.filter(p => 
-                    p.active && targetGroups.has(p.group || '未分類')
-                );
+                    // 1. 恢復人員狀態 (取消棄權，完全恢復成未中獎的初始狀態，讓他們可以再次被抽到)
+                    const updatedParticipants = scene.participants.map(p => {
+                        if (p.name === record.personName && p.group === record.personGroup) {
+                            return { ...p, forfeited: false, won: false, bonusWon: false };
+                        }
+                        return p;
+                    });
 
-                // 2. Calculate Eligible Candidates
-                const candidates = displayPool.filter(p => 
-                    isBonusDraw ? !p.bonusWon : !p.won
-                );
+                    // 2. 恢復獎項數量 (當初扣除的獎項+1，棄權數量-1，不再去動原本抽到的獎項)
+                    const updatedPrizes = scene.prizes.map(p => {
+                        if (p.id === 'forfeit') return { ...p, count: Math.max(0, p.count - 1) };
+                        if (record.deductedPrizeId && p.id === record.deductedPrizeId) {
+                            return { ...p, count: p.count + 1 };
+                        }
+                        return p;
+                    });
 
-                if (candidates.length === 0) { alert(`⚠️ 所選群組中已沒有符合資格的參與者！`); return; }
-                
-                const winner = getWeightedWinner(candidates, currentPrize.id);
-                if (!winner) { return; }
+                    // 3. 直接刪除該筆歷史紀錄 (不讓他回到任何獎項名單中)
+                    const updatedHistory = scene.history.filter(h => h.recordId !== record.recordId);
 
-                setDrawPool(displayPool); 
-                
-                // --- NEW: Direct Redraw ---
-                setShowWinnerModal(false); 
-                setShowRedrawModal(true);  
-                setIsRedrawSpinning(true);
-                setHighlightId(null);
-                setLastWinner({ person: winner, prize: currentPrize });
-                
-                SoundManager.startSpin();
+                    return { ...scene, participants: updatedParticipants, prizes: updatedPrizes, history: updatedHistory };
+                }));
+                setToastMsg("已取消棄權，恢復該員抽獎資格與扣除項目的名額！");
+            };
 
-                if (timerRef.current) clearInterval(timerRef.current);
-                timerRef.current = setInterval(() => {
-                    const randomIdx = Math.floor(Math.random() * candidates.length);
-                    setHighlightId(candidates[randomIdx].id); 
-                    setRedrawDisplay(candidates[randomIdx]); 
-                    SoundManager.tick();
-                }, 50);
-
-                setTimeout(() => {
-                    clearInterval(timerRef.current);
-                    SoundManager.stopSpin();
-                    
-                    setHighlightId(winner.id); 
-                    setRedrawDisplay(winner); 
-                    setIsRedrawSpinning(false); 
-                    triggerConfetti(); 
-                }, 3000);
-            }, [currentScene, currentPrize]);
-            
-            // Handle Redraw Click (Directly Execute)
-            const handleRedrawClick = useCallback(() => { 
-                executeRedraw(visibleGroups); 
-            }, [visibleGroups, executeRedraw]);
-
-            // Handle Retry Redraw
-            const handleRetryRedraw = useCallback(() => {
-                if (currentRedrawTarget) {
-                    executeRedraw(currentRedrawTarget);
-                } else {
-                    executeRedraw(visibleGroups);
+            // 批次改為棄權
+            const handleBatchRetrospectiveForfeit = () => {
+                const recordIds = Array.from(selectedForfeitIds);
+                if (recordIds.length === 0) {
+                    setToastMsg("⚠️ 請先勾選要棄權的人員！");
+                    return;
                 }
-            }, [currentRedrawTarget, visibleGroups, executeRedraw]);
+
+                const targetPrizeId = parseInt(currentScene.forfeitTargetId);
+                if (!targetPrizeId) {
+                    setToastMsg("⚠️ 請先至「設定」中選擇「棄權扣除項目」！");
+                    return;
+                }
+                const targetPrize = currentScene.prizes.find(p => p.id === targetPrizeId);
+                if (!targetPrize || targetPrize.count < recordIds.length) {
+                    setToastMsg(`⚠️ 設定的棄權扣除項目剩餘數量不足 (需要 ${recordIds.length} 個)！`);
+                    return;
+                }
+
+                setScenes(prev => prev.map(scene => {
+                    if (scene.id !== activeSceneId) return scene;
+                    
+                    let forfeitPrize = scene.prizes.find(p => p.id === 'forfeit');
+                    let updatedPrizes = [...scene.prizes];
+                    if (!forfeitPrize) {
+                        forfeitPrize = { id: 'forfeit', name: '棄權', count: 0, value: 0, isBonus: false };
+                        updatedPrizes.push(forfeitPrize);
+                    }
+
+                    const recordsToForfeit = scene.history.filter(h => recordIds.includes(h.recordId) && !h.isForfeit);
+                    const countToForfeit = recordsToForfeit.length;
+
+                    // 更新獎項數量
+                    updatedPrizes = updatedPrizes.map(p => {
+                        let newCount = p.count;
+                        if (p.id === targetPrizeId) newCount -= countToForfeit;
+                        if (p.id === 'forfeit') newCount += countToForfeit;
+                        
+                        // 恢復原本獎項的名額
+                        const recoveredCount = recordsToForfeit.filter(r => r.prizeId === p.id).length;
+                        newCount += recoveredCount;
+                        
+                        return { ...p, count: newCount };
+                    });
+
+                    // 更新歷史紀錄
+                    const updatedHistory = scene.history.map(h => {
+                        if (recordIds.includes(h.recordId) && !h.isForfeit) {
+                            return { 
+                                ...h, 
+                                isForfeit: true, 
+                                originalPrizeName: h.prizeName,
+                                deductedPrizeId: targetPrize.id,
+                                deductedPrizeName: targetPrize.name,
+                                prizeName: '棄權',
+                                prizeId: 'forfeit',
+                                prizeValue: targetPrize.value || 0
+                            };
+                        }
+                        return h;
+                    });
+
+                    // 強制喪失資格
+                    const updatedParticipants = scene.participants.map(p => {
+                        const isMatch = recordsToForfeit.some(r => r.personName === p.name && r.personGroup === p.group);
+                        if (isMatch) {
+                            return { ...p, forfeited: true, won: false, bonusWon: false };
+                        }
+                        return p;
+                    });
+                    
+                    return { ...scene, prizes: updatedPrizes, history: updatedHistory, participants: updatedParticipants };
+                }));
+
+                setToastMsg(`已將 ${recordIds.length} 人改為棄權，原獎項已恢復，並扣除「${targetPrize.name}」！`);
+                setIsForfeitMode(false);
+                setSelectedForfeitIds(new Set());
+            };
+
+            const handleCardClick = (record) => {
+                if (isForfeitMode) {
+                    if (record.isForfeit) return; // 已經棄權的無法再勾選為棄權
+                    const newSet = new Set(selectedForfeitIds);
+                    if (newSet.has(record.recordId)) {
+                        newSet.delete(record.recordId);
+                    } else {
+                        newSet.add(record.recordId);
+                    }
+                    setSelectedForfeitIds(newSet);
+                }
+            };
+
+            // 用於計算不滾動網格的最佳佈局
+            const getGridColsClass = (count) => {
+                if (count <= 1) return 'grid-cols-1 grid-rows-1';
+                if (count <= 2) return 'grid-cols-2 grid-rows-1';
+                if (count <= 3) return 'grid-cols-3 grid-rows-1';
+                if (count <= 4) return 'grid-cols-2 grid-rows-2';
+                if (count <= 6) return 'grid-cols-3 grid-rows-2';
+                if (count <= 9) return 'grid-cols-3 grid-rows-3';
+                if (count <= 12) return 'grid-cols-4 grid-rows-3';
+                if (count <= 16) return 'grid-cols-4 grid-rows-4';
+                if (count <= 20) return 'grid-cols-5 grid-rows-4';
+                if (count <= 25) return 'grid-cols-5 grid-rows-5';
+                if (count <= 30) return 'grid-cols-6 grid-rows-5';
+                if (count <= 36) return 'grid-cols-6 grid-rows-6';
+                if (count <= 42) return 'grid-cols-7 grid-rows-6';
+                if (count <= 49) return 'grid-cols-7 grid-rows-7';
+                if (count <= 64) return 'grid-cols-8 grid-rows-8';
+                return 'grid-cols-10 grid-rows-10';
+            };
 
             // --- Handlers for Prize Winners Modal ---
             const openPrizeWinners = (e, prize) => {
                 e.stopPropagation();
                 setViewingPrizeWinners(prize);
+                setIsForfeitMode(false);
+                setSelectedForfeitIds(new Set());
             };
             const closePrizeWinners = () => setViewingPrizeWinners(null);
 
-            // ... (Other state helpers same as before) ...
             const toggleParticipantActive = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.map(p => p.id===pId?{...p, active:!p.active}:p)} : s));
             const deleteParticipant = (pId) => setScenes(prev => prev.map(s => s.id === activeSceneId ? {...s, participants: s.participants.filter(p => p.id!==pId)} : s));
-            const handleAddNames = () => { if(!newNameList.trim())return; const names=newNameList.split('\n').filter(n=>n.trim()); const g=newGroupName.trim()||'一般'; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:[...s.participants, ...names.map(n=>({id:Date.now()+Math.random(), name:n.trim(), group:g, active:true, won:false, bonusWon:false}))]}:s)); setVisibleGroups(prev=>new Set(prev).add(g)); setNewNameList(''); };
+            const handleAddNames = () => { if(!newNameList.trim())return; const names=newNameList.split('\n').filter(n=>n.trim()); const g=newGroupName.trim()||'一般'; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:[...s.participants, ...names.map(n=>({id:Date.now()+Math.random(), name:n.trim(), group:g, active:true, won:false, bonusWon:false, forfeited:false}))]}:s)); setVisibleGroups(prev=>new Set(prev).add(g)); setNewNameList(''); };
             const handleAdminLogin = () => { if(adminPasswordInput==='355053'){setShowAdminLogin(false);setAdminPasswordInput('');setLoginError(false);setAdminTargetPrizeId(currentScene.prizes[0]?.id);setShowAdminPanel(true);}else{setLoginError(true);} };
             
             const updateWeight = (pid, w) => { 
@@ -973,7 +1034,6 @@
             
             const updateGroupWeights = (ps, w) => { 
                 if(!adminTargetPrizeId)return; 
-                
                 setScenes(prev=>prev.map(s=>{ 
                     if(s.id!==activeSceneId)return s; 
                     const newW={...s.weights}; 
@@ -990,46 +1050,31 @@
             const handleDragOver = (e, g) => { e.preventDefault(); setDragOverGroup(g); };
             const handleDrop = (e, g) => { e.preventDefault(); setDragOverGroup(null); const id=Number(e.dataTransfer.getData("text/plain")); if(!id)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, participants:s.participants.map(p=>p.id===id?{...p, group:g}:p)}:s)); };
             
-            // --- Custom Sound Logic (Restored & Updated for JSON Export) ---
             const handleSoundUpload = (type, event) => {
                 const file = event.target.files[0];
                 if (!file) return;
-
-                // 限制檔案大小 (2MB)，避免 JSON 過大導致瀏覽器當機
-                if (file.size > 2 * 1024 * 1024) {
-                    alert("音效檔案過大！請上傳小於 2MB 的音效檔，以確保設定檔能夠順利匯出。");
-                    event.target.value = null;
-                    return;
+                const url = URL.createObjectURL(file);
+                if (type === 'spin') {
+                    SoundManager.setCustomSpin(url);
+                    setCustomSoundNames(prev => ({ ...prev, spin: file.name }));
+                } else {
+                    SoundManager.setCustomWin(url);
+                    setCustomSoundNames(prev => ({ ...prev, win: file.name }));
                 }
-
-                // 使用 FileReader 將檔案轉為 Base64 (Data URI)
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64Data = e.target.result;
-                    if (type === 'spin') {
-                        SoundManager.setCustomSpin(base64Data);
-                        setCustomSounds(prev => ({ ...prev, spin: { name: file.name, data: base64Data } }));
-                    } else {
-                        SoundManager.setCustomWin(base64Data);
-                        setCustomSounds(prev => ({ ...prev, win: { name: file.name, data: base64Data } }));
-                    }
-                };
-                reader.readAsDataURL(file);
             };
 
             const handleResetSound = (type) => {
                 if (type === 'spin') {
                     SoundManager.setCustomSpin(null);
-                    setCustomSounds(prev => ({ ...prev, spin: null }));
+                    setCustomSoundNames(prev => ({ ...prev, spin: '' }));
                     if (spinSoundInputRef.current) spinSoundInputRef.current.value = '';
                 } else {
                     SoundManager.setCustomWin(null);
-                    setCustomSounds(prev => ({ ...prev, win: null }));
+                    setCustomSoundNames(prev => ({ ...prev, win: '' }));
                     if (winSoundInputRef.current) winSoundInputRef.current.value = '';
                 }
             };
-
-            // --- New Drag & Drop Logic for Groups ---
+            
             const handleGroupDragStart = (e, groupName) => {
                 e.stopPropagation();
                 e.dataTransfer.setData("application/lucky-draw-group", groupName);
@@ -1043,13 +1088,10 @@
 
                 const draggedGroupName = e.dataTransfer.getData("application/lucky-draw-group");
                 
-                // Case 1: Reordering Groups
                 if (draggedGroupName) {
                     if (draggedGroupName === targetGroupName) return;
-                    
                     setScenes(prev => prev.map(scene => {
                         if (scene.id !== activeSceneId) return scene;
-                        
                         const currentGroups = [];
                         const groupMap = {};
                         scene.participants.forEach(p => {
@@ -1063,7 +1105,6 @@
                         
                         const sourceIdx = currentGroups.indexOf(draggedGroupName);
                         const targetIdx = currentGroups.indexOf(targetGroupName);
-                        
                         if (sourceIdx === -1 || targetIdx === -1) return scene;
                         
                         currentGroups.splice(sourceIdx, 1);
@@ -1073,13 +1114,11 @@
                         currentGroups.forEach(g => {
                             newParticipants = newParticipants.concat(groupMap[g]);
                         });
-                        
                         return { ...scene, participants: newParticipants };
                     }));
                     return;
                 }
 
-                // Case 2: Moving Participant to Group (Existing logic)
                 const id = Number(e.dataTransfer.getData("text/plain"));
                 if (id) {
                     setScenes(prev => prev.map(s => 
@@ -1124,7 +1163,7 @@
                 }));
             };
 
-            const addNewScene = () => { const id=`scene-${Date.now()}`; setScenes([...scenes, {id, title:`新活動`, participants:[], prizes:[], history:[], weights:{}, consolationPrizeId: null}]); setActiveSceneId(id); };
+            const addNewScene = () => { const id=`scene-${Date.now()}`; setScenes([...scenes, {id, title:`新活動`, participants:[], prizes:[], history:[], weights:{}, forfeitTargetId: null}]); setActiveSceneId(id); };
             const deleteScene = (e, id) => { e.stopPropagation(); if(scenes.length===1)return; const ns=scenes.filter(s=>s.id!==id); setScenes(ns); if(activeSceneId===id)setActiveSceneId(ns[0].id); };
             const addPrize = () => { 
                 if(!newPrizeName.trim()) return; 
@@ -1134,41 +1173,50 @@
                 setNewPrizeValue(0); 
             };
             const updateSceneTitle = (t) => setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, title:t}:s));
-            
-            // Consolation Prize Setter
-            const setConsolationPrizeId = (id) => {
-                setScenes(prev => prev.map(s => s.id === activeSceneId ? { ...s, consolationPrizeId: id } : s));
-            };
-
             const openEditPrize = (p) => setEditingPrize({...p});
             const closeEditPrize = () => setEditingPrize(null);
             const handleUpdatePrize = () => { if(!editingPrize)return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.map(p=>p.id===editingPrize.id?{...p, name:editingPrize.name, count:parseInt(editingPrize.count), value:parseInt(editingPrize.value)||0, isBonus: editingPrize.isBonus}:p)}:s)); closeEditPrize(); };
-            const handleDeletePrize = () => { if(!confirm("Delete?"))return; setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.filter(p=>p.id!==editingPrize.id)}:s)); closeEditPrize(); if(selectedPrizeId===editingPrize.id)setSelectedPrizeId(null); };
+            
+            const handleDeletePrize = () => { 
+                setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.filter(p=>p.id!==editingPrize.id)}:s)); 
+                closeEditPrize(); 
+                if(selectedPrizeId===editingPrize.id)setSelectedPrizeId(null); 
+                setToastMsg("獎項已刪除！(如為誤刪可點擊上方復原鍵)");
+            };
+            
             const handleAddBonus = () => { setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:bonusName, count:parseInt(bonusCount), value:parseInt(bonusAmount)||0, isBonus:true}]} : s)); setShowBonusModal(false); setBonusName('加碼紅包'); setBonusAmount(1000); setBonusCount(1); };
 
             // Keyboard
             useEffect(() => {
                 const handleKeyDown = (e) => {
-                    if (e.code === 'PageUp') {
-                        e.preventDefault();
-                        if (showRedrawModal && !isRedrawSpinning && currentRedrawTarget) { confirmWin(); return; } // Redraw result confirm
-                        if (showWinnerModal && lastWinner && !showRedrawModal && !showForfeitConfirm) { confirmWin(); return; } // Normal win confirm
-                        if (!isSpinning && !showWinnerModal && !showRedrawModal && !showSettings && !showAdminLogin && !showAdminPanel && !showBonusModal) { startDraw(); return; } // Start draw
+                    const isTyping = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
+
+                    if (e.code === 'Enter') {
+                        if (isTyping) return; 
+                        e.preventDefault(); 
+                        if (showWinnerModal && lastWinner) { confirmWin(); return; } 
+                        if (!isSpinning && !showWinnerModal && !showSettings && !showAdminLogin && !showAdminPanel && !showBonusModal) { startDraw(); return; } 
                     }
                     if (e.code === 'PageDown') {
+                        if (isTyping) return;
                         e.preventDefault();
-                        if (showWinnerModal && lastWinner && !showRedrawModal && !showForfeitConfirm) { handleRedrawClick(); return; } // Re-draw
-                        if (showRedrawModal && !isRedrawSpinning) { handleRetryRedraw(); return; } // Retry redraw
+                        if (showWinnerModal && lastWinner) { handleForfeitDraw(); return; } 
                     }
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [isSpinning, showWinnerModal, showRedrawModal, showSettings, showAdminLogin, showAdminPanel, showBonusModal, isRedrawSpinning, currentRedrawTarget, startDraw, confirmWin, handleRedrawClick, executeRedraw, handleRetryRedraw, showForfeitConfirm]);
+            }, [isSpinning, showWinnerModal, showSettings, showAdminLogin, showAdminPanel, showBonusModal, startDraw, confirmWin, handleForfeitDraw]);
 
             return (
                 <div className="h-screen flex flex-col p-2 md:p-6 max-w-[95%] mx-auto w-full">
                     <input type="file" ref={fileInputRef} onChange={handleImport} style={{display: 'none'}} accept=".json" />
                     <input type="file" ref={participantsInputRef} onChange={handleImportParticipants} style={{display: 'none'}} accept=".csv" />
+
+                    {/* Toast 提示訊息 */}
+                    <div className={`fixed top-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-xl shadow-2xl z-[100] font-bold transition-all duration-300 transform flex items-center gap-2 ${toastMsg ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
+                        <AlertTriangle size={18} />
+                        {toastMsg}
+                    </div>
 
                     {/* Header */}
                     <div className="flex-none flex flex-wrap gap-3 mb-4 items-center">
@@ -1190,7 +1238,6 @@
                             <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯入設定"><Upload size={18} /><span className="hidden sm:inline">匯入</span></button>
                             <button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-red-50 hover:text-red-500 transition-all font-bold border border-gray-200" title="匯出設定"><Download size={18} /><span className="hidden sm:inline">匯出</span></button>
                             
-                            {/* Bonus Button Moved Here (Left of Settings) */}
                             <button 
                                 onClick={() => setShowBonusModal(true)}
                                 className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl shadow-lg hover:bg-orange-600 hover:scale-105 transition-all font-bold border border-orange-600"
@@ -1216,8 +1263,7 @@
                                         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3 w-full">
                                             {gridCandidates.map(p => {
                                                 const isHighlighted = p.id === highlightId;
-                                                // Check winner status strictly for style
-                                                const isWinner = currentPrize && currentPrize.isBonus ? p.bonusWon : p.won;
+                                                const isWinner = (currentPrize && currentPrize.isBonus ? p.bonusWon : p.won) || p.forfeited;
                                                 
                                                 return (
                                                     <div 
@@ -1226,14 +1272,13 @@
                                                         className={`
                                                             aspect-square rounded-xl flex items-center justify-center p-1 shadow-sm transition-all duration-75 border-2
                                                             ${isWinner 
-                                                                ? 'grid-cell-already-won' // Black bg, white text
+                                                                ? 'grid-cell-already-won' 
                                                                 : (isHighlighted 
-                                                                    ? 'grid-cell-winner shadow-2xl border-yellow-500' // Gold highlight
-                                                                    : 'grid-cell-normal border-red-300 opacity-90') // Normal Red
+                                                                    ? 'grid-cell-winner shadow-2xl border-yellow-500' 
+                                                                    : 'grid-cell-normal border-red-300 opacity-90') 
                                                             }
                                                         `}
                                                     >
-                                                        {/* Adjusted Text Size for 12 cols: text-sm or text-base usually works best */}
                                                         <div className="font-black text-center whitespace-nowrap overflow-hidden text-ellipsis text-sm md:text-base lg:text-lg text-white leading-none w-full">
                                                             {p.name}
                                                         </div>
@@ -1250,18 +1295,16 @@
                                 </div>
                             </div>
 
-                            {/* Prize Info (Bottom) - Swapped */}
+                            {/* Prize Info (Bottom) */}
                             <div className="flex-none mb-2 text-center w-full max-w-lg z-10">
-                                {/* Label Removed to save space */}
                                 <h2 className="text-5xl md:text-6xl font-black text-gray-800 flex items-center justify-center gap-4 drop-shadow-sm my-1 leading-relaxed py-1">
                                     <Gift className="text-red-500 w-12 h-12 md:w-16 md:h-16" strokeWidth={2.5} />
                                     <span className="">{currentPrize ? currentPrize.name : "—"}</span>
                                 </h2>
                                 <div className="flex justify-center gap-3 mt-2 flex-wrap">
-                                    <span className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">未中獎: {currentScene.participants.filter(p => !p.won).length}</span>
+                                    <span className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">未中獎: {currentScene.participants.filter(p => !p.won && !p.forfeited).length}</span>
                                     <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">總人數: {currentScene.participants.length}</span>
                                     <span className="bg-gray-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">剩餘: {currentPrize ? currentPrize.count : 0}</span>
-                                    {/* Added Value Display */}
                                     {currentPrize && currentPrize.value > 0 && <span className="bg-yellow-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md">價值: ${currentPrize.value.toLocaleString()}</span>}
                                 </div>
                             </div>
@@ -1272,7 +1315,7 @@
                             </div>
                         </div>
 
-                        {/* 3. Right: Info Panel (4 Cols) - Same as before */}
+                        {/* 3. Right: Info Panel (4 Cols) */}
                         <div className="lg:col-span-4 flex flex-col gap-4 h-full min-h-0">
                             {/* Prize List */}
                             <div className="flex-1 min-h-0 bg-white rounded-3xl p-1 shadow-inner border-2 border-red-100 flex flex-col">
@@ -1284,15 +1327,17 @@
                                     {currentScene.prizes.map((prize, idx) => {
                                         const isActivePrize = currentPrize && currentPrize.id === prize.id;
                                         return (
-                                            <div key={prize.id} onClick={() => setSelectedPrizeId(prize.id)} className={`relative px-4 py-2 rounded-lg flex justify-between items-center transition-all cursor-pointer group ${prize.count === 0 ? 'bg-gray-100 border-2 border-gray-200 opacity-60 grayscale' : (isActivePrize ? 'selected-prize-card' : 'bg-white list-card-shadow')}`}>
+                                            <div 
+                                                key={prize.id} 
+                                                onClick={() => { if(prize.id !== 'forfeit') setSelectedPrizeId(prize.id); }} 
+                                                className={`relative px-4 py-2 rounded-lg flex justify-between items-center transition-all group ${prize.count === 0 ? 'bg-gray-100 border-2 border-gray-200 opacity-60 grayscale' : (isActivePrize ? 'selected-prize-card' : 'bg-white list-card-shadow')} ${prize.id !== 'forfeit' ? 'cursor-pointer' : 'border-gray-400 bg-gray-50'}`}
+                                            >
                                                 <div className="flex flex-col">
                                                     <span className={`font-black text-lg ${prize.count === 0 ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{prize.name}</span>
                                                     {isActivePrize && prize.count > 0 && <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Current Target</span>}
-                                                    {/* Bonus Label */}
                                                     {prize.isBonus && <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mt-0.5">加碼 (Bonus)</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    {/* New: Prize Winners List Button */}
                                                     <button 
                                                         onClick={(e) => openPrizeWinners(e, prize)} 
                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100 mr-1"
@@ -1301,8 +1346,10 @@
                                                         <UserList size={16} />
                                                     </button>
 
-                                                    <div className={`w-10 h-8 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
-                                                    <button onClick={(e) => { e.stopPropagation(); openEditPrize(prize); }} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="修改獎項"><Pencil size={16} /></button>
+                                                    <div className={`w-10 h-8 flex items-center justify-center rounded-lg font-black text-lg shadow-sm ${prize.count > 0 ? (prize.id === 'forfeit' ? 'bg-gray-600 text-white' : 'bg-red-500 text-white') : 'bg-gray-300 text-gray-500'}`}>{prize.count}</div>
+                                                    {prize.id !== 'forfeit' && (
+                                                        <button onClick={(e) => { e.stopPropagation(); openEditPrize(prize); }} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="修改獎項"><Pencil size={16} /></button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -1318,15 +1365,18 @@
                                 </div>
                                 <ul className="flex-1 overflow-y-auto p-4 space-y-2">
                                     {currentScene.history.filter(record => !currentPrize || record.prizeId === currentPrize.id).map((record, idx) => (
-                                        <li key={idx} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-gray-100 animate-pop">
+                                        <li key={record.recordId || idx} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-gray-100 animate-pop">
                                             <span className="font-mono text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{record.time}</span>
                                             <div className="flex flex-col flex-1">
-                                                <span className="font-black text-lg text-gray-800 gold-text-impact">{record.personName}</span>
-                                                {record.personGroup && <span className="text-xs text-gray-400 font-bold gold-text-impact">{record.personGroup}</span>}
+                                                <span className={`font-black text-lg ${record.isForfeit ? 'text-gray-400' : 'text-gray-800 gold-text-impact'}`}>{record.personName}</span>
+                                                {record.personGroup && <span className={`text-xs font-bold ${record.isForfeit ? 'text-gray-400' : 'text-gray-400 gold-text-impact'}`}>{record.personGroup}</span>}
                                             </div>
                                             <div className="flex flex-col items-end">
-                                                <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">{record.prizeName}</span>
-                                                {record.prizeValue > 0 && <span className="text-[10px] text-gray-400 mt-1 font-bold">${record.prizeValue.toLocaleString()}</span>}
+                                                <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">
+                                                    {record.prizeName} {record.isForfeit && record.originalPrizeName ? <span className="text-gray-400 ml-1">(原: {record.originalPrizeName})</span> : ''}
+                                                </span>
+                                                {record.prizeValue > 0 && !record.isForfeit && <span className="text-[10px] text-gray-400 mt-1 font-bold">${record.prizeValue.toLocaleString()}</span>}
+                                                {record.isForfeit && <span className="text-[10px] text-gray-400 mt-1 font-bold">棄權</span>}
                                             </div>
                                         </li>
                                     ))}
@@ -1348,55 +1398,152 @@
                         </div>
                     </main>
 
-                    {/* Modals... (Same as before) */}
-                    {/* Bonus, Edit, Admin Login, Admin Panel, Settings, Redraw Menu, Small Redraw Modal, Main Winner Modal */}
-                    
-                    {/* NEW: Prize Winners List Modal */}
+                    {/* Prize Winners List Modal (方塊自適應版 & 棄權清單版) */}
                     {viewingPrizeWinners && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closePrizeWinners}>
-                            {/* Changed max-w-lg to max-w-[90vw] and added h-[85vh] for size */}
-                            <div className="bg-white rounded-3xl p-8 w-full max-w-[90vw] h-[85vh] shadow-2xl animate-pop border-4 border-blue-200 flex flex-col" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                    {/* Increased title size */}
-                                    <h3 className="font-black text-4xl text-gray-800 flex items-center gap-3">
-                                        <Trophy className="text-yellow-500 w-10 h-10" />
+                            <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-[95vw] h-[90vh] shadow-2xl animate-pop border-4 border-blue-200 flex flex-col relative" onClick={e => e.stopPropagation()}>
+                                {/* Header */}
+                                <div className="flex justify-between items-center mb-4 border-b pb-4 flex-none">
+                                    <h3 className="font-black text-2xl md:text-4xl text-gray-800 flex items-center gap-3">
+                                        <Trophy className="text-yellow-500 w-8 h-8 md:w-10 md:h-10" />
                                         {viewingPrizeWinners.name} 得獎名單
                                     </h3>
-                                    <button onClick={closePrizeWinners} className="p-3 hover:bg-gray-100 rounded-full transition"><X size={32}/></button>
+                                    <div className="flex items-center gap-2 md:gap-4">
+                                        {/* 只有在一般獎項（非棄權）才顯示批次棄權按鈕 */}
+                                        {viewingPrizeWinners.id !== 'forfeit' && currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id && !h.isForfeit).length > 0 && (
+                                            <button 
+                                                onClick={() => {
+                                                    setIsForfeitMode(!isForfeitMode);
+                                                    setSelectedForfeitIds(new Set());
+                                                }}
+                                                className={`px-3 md:px-5 py-2 md:py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-2 text-sm md:text-base ${isForfeitMode ? 'bg-gray-800 text-white' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                                            >
+                                                {isForfeitMode ? <X size={18}/> : <CheckSquare size={18}/>}
+                                                {isForfeitMode ? '取消勾選' : '批次棄權'}
+                                            </button>
+                                        )}
+                                        <button onClick={closePrizeWinners} className="p-2 md:p-3 hover:bg-gray-100 rounded-full transition bg-gray-50"><X size={28}/></button>
+                                    </div>
                                 </div>
-                                <div className="overflow-y-auto flex-1 custom-scrollbar">
-                                    {currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id).length > 0 ? (
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="text-gray-500 text-xl border-b-2 border-gray-100">
-                                                    <th className="py-4 px-4">姓名</th>
-                                                    <th className="py-4 px-4">部門</th>
-                                                    <th className="py-4 px-4 text-right">時間</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {currentScene.history
-                                                    .filter(h => h.prizeId === viewingPrizeWinners.id)
-                                                    .map((record, idx) => (
-                                                        <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                                                            {/* Increased content font sizes */}
-                                                            <td className="py-4 px-4 text-3xl font-black text-gray-800">{record.personName}</td>
-                                                            <td className="py-4 px-4 text-xl text-gray-600 font-bold">{record.personGroup || '-'}</td>
-                                                            <td className="py-4 px-4 text-right text-lg text-gray-400 font-mono">{record.time}</td>
+
+                                {/* Content Area */}
+                                {viewingPrizeWinners.id === 'forfeit' ? (
+                                    /* --- 棄權名單專屬顯示 (表格) --- */
+                                    <div className="overflow-y-auto flex-1 custom-scrollbar">
+                                        {(() => {
+                                            const forfeitList = currentScene.history.filter(h => h.prizeId === 'forfeit');
+                                            if (forfeitList.length === 0) {
+                                                return (
+                                                    <div className="flex flex-col items-center justify-center h-full text-gray-300">
+                                                        <Users size={80} className="mb-4 opacity-20" />
+                                                        <p className="text-2xl font-bold">目前沒有棄權紀錄</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="text-gray-500 text-xl border-b-2 border-gray-100">
+                                                            <th className="py-4 px-4 w-1/3">名稱</th>
+                                                            <th className="py-4 px-4 w-1/3">部門</th>
+                                                            <th className="py-4 px-4 text-center w-1/3">操作</th>
                                                         </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {forfeitList.map((record, idx) => (
+                                                            <tr key={record.recordId || idx} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                                                                <td className="py-4 px-4 text-3xl font-black text-gray-500 line-through">{record.personName}</td>
+                                                                <td className="py-4 px-4 text-xl text-gray-400 font-bold">{record.personGroup || '-'}</td>
+                                                                <td className="py-4 px-4 text-center">
+                                                                    <button 
+                                                                        onClick={() => handleCancelForfeit(record)}
+                                                                        className="text-base font-bold bg-green-100 text-green-700 px-5 py-2.5 rounded-lg hover:bg-green-200 transition whitespace-nowrap shadow-sm"
+                                                                    >
+                                                                        取消棄權
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            );
+                                        })()}
+                                    </div>
+                                ) : (
+                                    /* --- 一般得獎名單顯示 (自適應不滾動網格) --- */
+                                    <div className="flex-1 overflow-hidden flex flex-col p-2">
+                                        {(() => {
+                                            // 嚴格過濾該獎項，不包含任何已棄權者
+                                            const winnersList = currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id && !h.isForfeit);
+
+                                            if (winnersList.length === 0) {
+                                                return (
+                                                    <div className="flex flex-col items-center justify-center h-full text-gray-300">
+                                                        <Users size={80} className="mb-4 opacity-20" />
+                                                        <p className="text-2xl font-bold">尚未抽出得主</p>
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <div className={`grid gap-2 md:gap-4 w-full h-full ${getGridColsClass(winnersList.length)}`}>
+                                                    {winnersList.map((record, idx) => (
+                                                        <div 
+                                                            key={record.recordId || idx}
+                                                            onClick={() => handleCardClick(record)}
+                                                            className={`winner-card relative rounded-2xl md:rounded-3xl flex flex-col items-center justify-center p-2 shadow-md transition-all border-4 cursor-pointer select-none bg-gradient-to-br from-red-500 to-red-600 border-red-400 text-white hover:scale-105 hover:shadow-xl
+                                                                ${isForfeitMode && selectedForfeitIds.has(record.recordId) ? 'ring-4 ring-yellow-400 scale-105 shadow-[0_0_20px_rgba(250,204,21,0.6)]' : ''}
+                                                            `}
+                                                            title={isForfeitMode ? "點擊選取" : ""}
+                                                        >
+                                                            {isForfeitMode && (
+                                                                <div className="absolute top-2 right-2 md:top-3 md:right-3 w-6 h-6 md:w-8 md:h-8 rounded-full border-[3px] border-white/50 flex items-center justify-center bg-black/20 shadow-inner">
+                                                                    {selectedForfeitIds.has(record.recordId) && <div className="w-3 h-3 md:w-5 md:h-5 bg-yellow-400 rounded-full shadow-sm"></div>}
+                                                                </div>
+                                                            )}
+                                                            <div className="text-dynamic-group font-bold opacity-90 mb-1 md:mb-2 w-full text-center leading-tight">
+                                                                {record.personGroup || '一般'}
+                                                            </div>
+                                                            <div className="text-dynamic-name font-black w-full text-center tracking-wide leading-none" style={{wordBreak: "break-word", hyphens: "auto"}}>
+                                                                {record.personName}
+                                                            </div>
+                                                        </div>
                                                     ))}
-                                            </tbody>
-                                        </table>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center h-full text-gray-300">
-                                            <Users size={80} className="mb-4 opacity-20" />
-                                            <p className="text-2xl font-bold">尚未抽出得主</p>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                                
+                                {/* Bottom Action Bar (Only in Forfeit Mode) */}
+                                {isForfeitMode && viewingPrizeWinners.id !== 'forfeit' && (
+                                    <div className="mt-4 pt-4 border-t flex justify-between items-center bg-gray-50 -mx-6 md:-mx-8 -mb-6 md:-mb-8 p-4 md:p-6 rounded-b-3xl flex-none">
+                                        <span className="font-bold text-gray-600 text-sm md:text-lg ml-2">
+                                            已選取: <span className="text-red-600 text-xl md:text-2xl">{selectedForfeitIds.size}</span> 人
+                                        </span>
+                                        <div className="flex gap-2 md:gap-4 pr-2">
+                                            <button 
+                                                onClick={() => { setIsForfeitMode(false); setSelectedForfeitIds(new Set()); }} 
+                                                className="px-4 md:px-6 py-2 md:py-3 bg-gray-200 text-gray-700 font-bold rounded-xl md:rounded-2xl hover:bg-gray-300 transition"
+                                            >
+                                                取消
+                                            </button>
+                                            <button 
+                                                onClick={handleBatchRetrospectiveForfeit} 
+                                                className="px-4 md:px-8 py-2 md:py-3 bg-red-600 text-white font-black rounded-xl md:rounded-2xl hover:bg-red-700 shadow-lg flex items-center gap-2 transition"
+                                            >
+                                                <Trash2 size={20}/> 確定轉為棄權
+                                            </button>
                                         </div>
-                                    )}
-                                </div>
-                                <div className="mt-6 pt-4 border-t flex justify-end text-xl font-bold text-gray-500">
-                                    共 {currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id).length} 位得主
-                                </div>
+                                    </div>
+                                )}
+
+                                {/* Bottom Info Bar (For Normal display) */}
+                                {!isForfeitMode && (
+                                    <div className="mt-4 pt-4 border-t flex justify-end text-xl font-bold text-gray-500 flex-none">
+                                        共 {currentScene.history.filter(h => h.prizeId === viewingPrizeWinners.id && !h.isForfeit).length} 人
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1468,8 +1615,6 @@
                                             <input type="number" className="w-full border-2 border-gray-200 rounded-lg p-2 font-bold text-gray-700 focus:border-red-500 focus:outline-none" min="0" value={editingPrize.count} onChange={e => setEditingPrize({...editingPrize, count: e.target.value})} />
                                         </div>
                                     </div>
-                                    {/* Checkbox for Bonus Prize */}
-                                    {/* 移除手動勾選介面，避免混淆 */}
                                 </div>
                                 <div className="flex gap-3 mt-6">
                                     <button onClick={handleDeletePrize} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 transition">刪除</button>
@@ -1507,7 +1652,7 @@
                                 <div className="p-6 bg-gray-100 flex items-center gap-4 border-b">
                                     <span className="font-bold text-gray-700">設定目標獎項：</span>
                                     <select className="p-2 rounded-lg border-2 border-gray-300 font-bold flex-1 max-w-md" value={adminTargetPrizeId || ''} onChange={(e) => setAdminTargetPrizeId(parseInt(e.target.value))}>
-                                        {currentScene.prizes.map(p => ( <option key={p.id} value={p.id}>{p.name} (剩餘 {p.count})</option> ))}
+                                        {currentScene.prizes.filter(p => p.id !== 'forfeit').map(p => ( <option key={p.id} value={p.id}>{p.name} (剩餘 {p.count})</option> ))}
                                     </select>
                                 </div>
                                 <div className="p-6 overflow-y-auto flex-1 space-y-6">
@@ -1524,10 +1669,9 @@
                                                     const weight = currentScene.weights?.[adminTargetPrizeId]?.[p.id] !== undefined ? currentScene.weights[adminTargetPrizeId][p.id] : 1;
                                                     const isOn = weight > 0;
                                                     
-                                                    // Determine exclusion based on prize type
                                                     const targetPrizeInPanel = currentScene.prizes.find(p => p.id === adminTargetPrizeId);
                                                     const isTargetBonus = targetPrizeInPanel?.isBonus;
-                                                    const isExcluded = isTargetBonus ? p.bonusWon : p.won;
+                                                    const isExcluded = isTargetBonus ? p.bonusWon : (p.won || p.forfeited);
 
                                                     return (
                                                         <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border-2 transition-colors ${isOn ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-200'}`}>
@@ -1560,27 +1704,6 @@
                                     <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-200 rounded-full transition"><X/></button>
                                 </div>
                                 <div className="p-8 overflow-y-auto flex-1 space-y-8">
-                                    {/* General Settings: Consolation Prize */}
-                                    <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
-                                        <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Settings size={18}/> 一般設定</h3>
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-gray-700">指定參加獎</span>
-                                                <span className="text-xs text-gray-400">當選擇「棄權」時，將自動視為中此獎項</span>
-                                            </div>
-                                            <select 
-                                                className="p-2 rounded-lg border-2 border-gray-300 font-bold text-sm min-w-[150px]"
-                                                value={currentScene.consolationPrizeId || ''}
-                                                onChange={(e) => setConsolationPrizeId(e.target.value ? parseInt(e.target.value) : null)}
-                                            >
-                                                <option value="">-- 請選擇獎項 --</option>
-                                                {currentScene.prizes.map(p => (
-                                                    <option key={p.id} value={p.id}>{p.name} (剩餘 {p.count})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-
                                     {/* Sound Settings Block */}
                                     <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
                                         <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Volume2 size={18}/> 音效設定</h3>
@@ -1600,7 +1723,7 @@
                                                         onChange={(e) => handleSoundUpload('spin', e)}
                                                     />
                                                     <span className="text-xs text-gray-500 font-medium mr-2 truncate max-w-[100px]">
-                                                        {customSounds.spin?.name || "預設音效"}
+                                                        {customSoundNames.spin || "預設音效"}
                                                     </span>
                                                     <button 
                                                         onClick={() => spinSoundInputRef.current.click()} 
@@ -1615,7 +1738,7 @@
                                                     >
                                                         <Play size={14} fill="currentColor" />
                                                     </button>
-                                                    {customSounds.spin && (
+                                                    {customSoundNames.spin && (
                                                         <button 
                                                             onClick={() => handleResetSound('spin')}
                                                             className="text-red-400 hover:text-red-600 p-1"
@@ -1642,7 +1765,7 @@
                                                         onChange={(e) => handleSoundUpload('win', e)}
                                                     />
                                                     <span className="text-xs text-gray-500 font-medium mr-2 truncate max-w-[100px]">
-                                                        {customSounds.win?.name || "預設音效"}
+                                                        {customSoundNames.win || "預設音效"}
                                                     </span>
                                                     <button 
                                                         onClick={() => winSoundInputRef.current.click()} 
@@ -1657,7 +1780,7 @@
                                                     >
                                                         <Play size={14} fill="currentColor" />
                                                     </button>
-                                                    {customSounds.win && (
+                                                    {customSoundNames.win && (
                                                         <button 
                                                             onClick={() => handleResetSound('win')}
                                                             className="text-red-400 hover:text-red-600 p-1"
@@ -1690,6 +1813,7 @@
                                             </div>
                                         </div>
                                     </div>
+                                    
                                     <div>
                                         <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Gift size={18}/> 新增獎項</h3>
                                         <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100">
@@ -1713,6 +1837,31 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* 棄權扣除項目 */}
+                                    <div>
+                                        <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Trash2 size={18}/> 棄權扣除項目</h3>
+                                        <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100 flex items-center gap-4">
+                                            <div className="flex-1">
+                                                <label className="block text-xs font-bold text-gray-500 mb-1">請選擇棄權時自動扣除數量的獎項</label>
+                                                <select 
+                                                    className="w-full border-2 border-gray-200 p-2.5 rounded-lg focus:border-red-500 focus:outline-none font-bold text-gray-700"
+                                                    value={currentScene.forfeitTargetId || ''}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        setScenes(prev => prev.map(s => s.id === activeSceneId ? { ...s, forfeitTargetId: val } : s));
+                                                    }}
+                                                >
+                                                    <option value="">請選擇...</option>
+                                                    {currentScene.prizes.filter(p => p.id !== 'forfeit').map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name} (剩餘 {p.count})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-400 mt-2 ml-1">※ 設定後，在抽獎畫面按下「放棄資格」，系統會自動將該項目名額轉移至棄權中。</p>
+                                    </div>
+
                                     <div>
                                         <div className="flex justify-between items-end mb-4">
                                             <div>
@@ -1766,18 +1915,19 @@
                                                                 onDragEnd={(e) => { e.target.classList.remove("dragging"); setDragOverGroup(null); }}
                                                                 onDragOver={handleParticipantDragOver}
                                                                 onDrop={(e) => handleParticipantDrop(e, p.id)}
-                                                                className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all relative group cursor-move ${p.won ? 'bg-gray-100 border-gray-100 opacity-50' : 'bg-white border-gray-100 hover:border-red-200 hover:shadow-sm'}`}
+                                                                className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all relative group cursor-move ${(p.won || p.forfeited) ? 'bg-gray-100 border-gray-100 opacity-50' : 'bg-white border-gray-100 hover:border-red-200 hover:shadow-sm'}`}
                                                             >
                                                                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                                    <input type="checkbox" checked={p.active} disabled={p.won} onChange={() => toggleParticipantActive(p.id)} className="w-4 h-4 accent-red-600 rounded shrink-0 cursor-pointer" onClick={(e) => e.stopPropagation()} />
+                                                                    <input type="checkbox" checked={p.active} disabled={p.won || p.forfeited} onChange={() => toggleParticipantActive(p.id)} className="w-4 h-4 accent-red-600 rounded shrink-0 cursor-pointer" onClick={(e) => e.stopPropagation()} />
                                                                     <span className={`font-bold truncate text-sm ${!p.active ? 'line-through text-gray-400' : 'text-gray-700'}`}>{p.name}</span>
                                                                 </div>
-                                                                {!p.won && (
+                                                                {!(p.won || p.forfeited) && (
                                                                     <button onClick={(e) => { e.stopPropagation(); deleteParticipant(p.id); }} className="text-gray-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors shrink-0" title="移除此人">
                                                                         <X size={14} strokeWidth={3}/>
                                                                     </button>
                                                                 )}
                                                                 {p.won && <span className="text-[10px] font-black bg-gray-600 text-white px-1 py-0.5 rounded shrink-0">WIN</span>}
+                                                                {p.forfeited && <span className="text-[10px] font-black bg-red-600 text-white px-1 py-0.5 rounded shrink-0">棄權</span>}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -1790,84 +1940,15 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-                                    <button onClick={() => { setShowSettings(false); handleRedrawClick(); }} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-pink-200 text-red-600 rounded-xl hover:bg-pink-50 font-bold shadow-sm transition"><RefreshCw size={18}/> 重抽模式</button>
+                                <div className="p-4 border-t bg-gray-50 flex justify-end items-center">
                                     <button onClick={() => setShowSettings(false)} className="px-8 py-3 bg-gray-900 text-white rounded-xl hover:bg-black font-bold shadow-lg">完成設定</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Redraw Selection Menu */}
-                    {/* (This section is intentionally removed as we are now doing direct redraw) */}
-
-                    {/* Small Redraw Modal */}
-                    {showRedrawModal && (
-                        <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
-                            <div className="bg-white rounded-[32px] md:rounded-[50px] w-full max-w-[95%] max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(239,68,68,0.6)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
-                                <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-red-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
-                                    <RefreshCw size={36} className="text-white md:hidden animate-spin-slow" />
-                                    <RefreshCw size={72} className="text-white hidden md:block animate-spin-slow" />
-                                </div>
-                                <div ref={redrawGridRef} className="overflow-y-auto px-4 md:px-10 py-5 md:py-8 flex-1 custom-scrollbar mt-6 md:mt-8 rounded-[40px] flex flex-col items-center w-full">
-                                    <div className="text-red-400 font-black uppercase tracking-widest text-sm md:text-xl mb-2 md:mb-4 mt-4 md:mt-0">
-                                        {isRedrawSpinning ? "REROLLING..." : "NEW WINNER!"}
-                                    </div>
-                                    {isRedrawSpinning ? (
-                                        /* Redraw Grid Animation */
-                                        <div className="w-full grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3 p-4 bg-white/50 rounded-3xl border-4 border-red-200">
-                                            {/* Show current draw pool */}
-                                            {drawPool.map(p => {
-                                                const isHighlighted = p.id === highlightId;
-                                                const isWinner = currentPrize && currentPrize.isBonus ? p.bonusWon : p.won;
-                                                return (
-                                                    <div 
-                                                        key={p.id}
-                                                        id={`redraw-cell-${p.id}`} // Change for redraw
-                                                        className={`
-                                                            aspect-square rounded-xl flex items-center justify-center p-1 shadow-sm transition-all duration-75 border-2
-                                                            ${isWinner 
-                                                                ? 'grid-cell-already-won' // Black bg, white text
-                                                                : (isHighlighted 
-                                                                    ? 'grid-cell-winner shadow-2xl border-yellow-500' 
-                                                                    : 'grid-cell-normal border-red-300 opacity-90') 
-                                                            }
-                                                        `}
-                                                    >
-                                                        <div className="font-black text-center whitespace-nowrap overflow-hidden text-ellipsis text-sm md:text-base lg:text-lg text-white leading-none w-full">
-                                                            {p.name}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    ) : (
-                                        /* Redraw Winner Result */
-                                        <div className="w-full flex flex-col items-center animate-pop flex-1 justify-center">
-                                            <div className="text-4xl sm:text-6xl lg:text-8xl font-black gold-text-impact mb-1 break-words leading-tight py-2 text-center w-full">{redrawDisplay?.name}</div>
-                                            <div className="text-lg md:text-2xl font-bold gold-text-impact mb-6 tracking-widest opacity-90 text-center w-full">{redrawDisplay?.group}</div>
-                                            
-                                            <div className="bg-red-50 rounded-[16px] md:rounded-[24px] p-3 md:p-6 mb-6 border-[3px] md:border-[5px] border-red-100 shadow-inner w-full text-center max-w-3xl">
-                                                <div className="text-xs md:text-base text-red-500 font-black uppercase tracking-widest mb-1">Prize Won</div>
-                                                <div className="text-2xl sm:text-4xl md:text-6xl font-black text-gray-800 leading-tight">
-                                                    {lastWinner?.prize?.name}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full max-w-2xl mt-auto">
-                                                <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-8 md:h-8"/> 確認收下</button>
-                                                <button onClick={() => setShowForfeitConfirm(true)} className="flex-1 bg-red-500 text-white py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-red-600 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><AlertTriangle className="w-5 h-5 md:w-8 md:h-8"/> 棄權</button>
-                                                <button onClick={handleRetryRedraw} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-5 rounded-xl md:rounded-3xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-8 md:h-8"/> 重抽</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Main Winner Modal */}
-                    {showWinnerModal && lastWinner && !showRedrawModal && !showForfeitConfirm && (
+                    {showWinnerModal && lastWinner && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-4" onClick={() => {}}>
                             <div className="bg-white rounded-[40px] md:rounded-[60px] w-full max-w-5xl max-h-[90vh] flex flex-col relative shadow-[0_0_150px_rgba(250,204,21,0.8)] animate-pop rainbow-border overflow-visible transition-transform duration-300" style={{transform: 'scale(0.97)'}} onClick={e => e.stopPropagation()}>
                                 <div className="absolute -top-10 md:-top-16 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full p-3 md:p-5 border-[4px] md:border-[6px] border-white shadow-2xl z-20">
@@ -1884,26 +1965,8 @@
                                     </div>
                                     <div className="flex flex-col md:flex-row gap-2 md:gap-4 pb-1 w-full mt-auto">
                                         <button onClick={confirmWin} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:scale-105 transition shadow-xl uppercase tracking-wider flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5 md:w-7 md:h-7"/> 開心收下 🎉</button>
-                                        <button onClick={() => setShowForfeitConfirm(true)} className="flex-1 bg-red-500 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-red-600 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><AlertTriangle className="w-5 h-5 md:w-7 md:h-7"/> 棄權</button>
-                                        <button onClick={handleRedrawClick} className="flex-1 bg-gray-200 text-gray-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-gray-300 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5 md:w-7 md:h-7"/> 重抽 🔄</button>
+                                        <button onClick={handleForfeitDraw} className="flex-1 bg-red-100 text-red-600 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-lg md:text-2xl hover:bg-red-200 hover:scale-105 transition shadow-lg uppercase tracking-wider flex items-center justify-center gap-2"><X className="w-5 h-5 md:w-7 md:h-7"/> 放棄資格 (棄權)</button>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Forfeit Confirmation Modal */}
-                    {showForfeitConfirm && (
-                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[60] p-4" onClick={() => setShowForfeitConfirm(false)}>
-                            <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-pop border-4 border-red-500 text-center" onClick={e => e.stopPropagation()}>
-                                <AlertOctagon size={64} className="text-red-500 mx-auto mb-4" />
-                                <h3 className="font-black text-3xl text-gray-800 mb-2">是否真的棄權？</h3>
-                                <p className="text-gray-500 mb-8 text-lg font-bold">
-                                    棄權後將視為中「{currentScene.prizes.find(p => p.id === currentScene.consolationPrizeId)?.name || '參加獎'}」，且無法再參與其他抽獎。
-                                </p>
-                                <div className="flex gap-4">
-                                    <button onClick={confirmForfeit} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black text-xl hover:bg-red-600 transition shadow-lg">是 (棄權)</button>
-                                    <button onClick={() => setShowForfeitConfirm(false)} className="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-black text-xl hover:bg-gray-300 transition shadow-lg">否 (返回)</button>
                                 </div>
                             </div>
                         </div>
