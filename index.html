@@ -568,21 +568,24 @@
 
             const handleExport = () => {
                 const exportData = {
+                    version: "1.1",
                     scenes: scenes,
                     sounds: {
-                        spinUrl: SoundManager.customSpinUrl,
-                        spinName: customSoundNames.spin,
-                        winUrl: SoundManager.customWinUrl,
-                        winName: customSoundNames.win
+                        spin: SoundManager.customSpinUrl ? { name: customSoundNames.spin, data: SoundManager.customSpinUrl } : null,
+                        win: SoundManager.customWinUrl ? { name: customSoundNames.win, data: SoundManager.customWinUrl } : null
                     }
                 };
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
+                const jsonStr = JSON.stringify(exportData);
+                const blob = new Blob([jsonStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                
                 const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("href", url);
                 downloadAnchorNode.setAttribute("download", "lucky_draw_backup.json");
                 document.body.appendChild(downloadAnchorNode);
                 downloadAnchorNode.click();
                 downloadAnchorNode.remove();
+                URL.revokeObjectURL(url);
             };
 
             const handleImport = (event) => {
@@ -593,35 +596,35 @@
                 reader.onload = (e) => {
                     try {
                         const importedData = JSON.parse(e.target.result);
-                        let safeScenes = null;
+                        let importedScenes;
                         
-                        // 兼容舊版(陣列)與新版(物件含音效)格式
                         if (Array.isArray(importedData)) {
-                            safeScenes = importedData.map(s => ({ ...s, weights: s.weights || {} }));
-                        } else if (importedData && Array.isArray(importedData.scenes)) {
-                            safeScenes = importedData.scenes.map(s => ({ ...s, weights: s.weights || {} }));
-                            
-                            // 處理匯入的音效
+                            importedScenes = importedData;
+                        } else if (importedData.version && importedData.scenes) {
+                            importedScenes = importedData.scenes;
                             if (importedData.sounds) {
-                                if (importedData.sounds.spinUrl) {
-                                    SoundManager.setCustomSpin(importedData.sounds.spinUrl);
-                                    setCustomSoundNames(prev => ({ ...prev, spin: importedData.sounds.spinName || '已匯入音效' }));
+                                if (importedData.sounds.spin?.data) {
+                                    SoundManager.setCustomSpin(importedData.sounds.spin.data);
+                                    setCustomSoundNames(prev => ({ ...prev, spin: importedData.sounds.spin.name }));
                                 }
-                                if (importedData.sounds.winUrl) {
-                                    SoundManager.setCustomWin(importedData.sounds.winUrl);
-                                    setCustomSoundNames(prev => ({ ...prev, win: importedData.sounds.winName || '已匯入音效' }));
+                                if (importedData.sounds.win?.data) {
+                                    SoundManager.setCustomWin(importedData.sounds.win.data);
+                                    setCustomSoundNames(prev => ({ ...prev, win: importedData.sounds.win.name }));
                                 }
                             }
+                        } else {
+                            setToastMsg("❌ 檔案格式錯誤。");
+                            return;
                         }
 
-                        if (safeScenes) {
-                            setScenes(safeScenes);
-                            if (!safeScenes.find(s => s.id === activeSceneId)) setActiveSceneId(safeScenes[0]?.id || 'scene-1');
-                            setToastMsg("✅ 資料與設定匯入成功！");
-                        } else { 
-                            setToastMsg("❌ 檔案格式錯誤。"); 
-                        }
-                    } catch (error) { setToastMsg("❌ 匯入失敗。"); }
+                        const safeScenes = importedScenes.map(s => ({ ...s, weights: s.weights || {} }));
+                        setScenes(safeScenes);
+                        if (!safeScenes.find(s => s.id === activeSceneId)) setActiveSceneId(safeScenes[0]?.id || 'scene-1');
+                        setToastMsg("✅ 資料與設定匯入成功！");
+                    } catch (error) { 
+                        console.error(error);
+                        setToastMsg("❌ 匯入失敗。"); 
+                    }
                 };
                 reader.readAsText(fileObj);
                 event.target.value = null;
@@ -1084,20 +1087,14 @@
             const handleSoundUpload = (type, event) => {
                 const file = event.target.files[0];
                 if (!file) return;
-                
-                // 改用 FileReader 將音檔轉為 Base64 Data URL，這樣才能封裝進 JSON 匯出
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const url = e.target.result;
-                    if (type === 'spin') {
-                        SoundManager.setCustomSpin(url);
-                        setCustomSoundNames(prev => ({ ...prev, spin: file.name }));
-                    } else {
-                        SoundManager.setCustomWin(url);
-                        setCustomSoundNames(prev => ({ ...prev, win: file.name }));
-                    }
-                };
-                reader.readAsDataURL(file);
+                const url = URL.createObjectURL(file);
+                if (type === 'spin') {
+                    SoundManager.setCustomSpin(url);
+                    setCustomSoundNames(prev => ({ ...prev, spin: file.name }));
+                } else {
+                    SoundManager.setCustomWin(url);
+                    setCustomSoundNames(prev => ({ ...prev, win: file.name }));
+                }
             };
 
             const handleResetSound = (type) => {
@@ -1226,6 +1223,9 @@
             // Keyboard
             useEffect(() => {
                 const handleKeyDown = (e) => {
+                    // 新增：防連發機制。如果按鍵是被按住不放而連續觸發的，就直接忽略
+                    if (e.repeat) return;
+
                     const isTyping = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
 
                     if (e.code === 'Enter') {
