@@ -770,9 +770,6 @@
             };
 
             const startDraw = useCallback(() => {
-                SoundManager.init();
-                SoundManager.startSpin();
-
                 const visibleParticipants = currentScene.participants.filter(p => 
                     p.active && visibleGroups.has(p.group || '未分類')
                 );
@@ -785,6 +782,10 @@
                 if (!currentPrize) { setToastMsg("😱 目前沒有獎項！"); return; }
                 if (currentPrize.count <= 0) { setToastMsg("😱 這個獎項已經抽完了！請選擇其他獎項。"); return; }
                 if (eligibleCandidates.length === 0) { setToastMsg("⚠️ 沒有符合資格的參與者！(請確認是否已在設定中勾選對應部門)"); return; }
+
+                // 修正：將音效觸發移至所有檢查條件都通過之後，避免沒名額還觸發音效
+                SoundManager.init();
+                SoundManager.startSpin();
 
                 setDrawPool(visibleParticipants); 
                 setIsSpinning(true);
