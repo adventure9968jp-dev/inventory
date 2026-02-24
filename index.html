@@ -1087,14 +1087,23 @@
             const handleSoundUpload = (type, event) => {
                 const file = event.target.files[0];
                 if (!file) return;
-                const url = URL.createObjectURL(file);
-                if (type === 'spin') {
-                    SoundManager.setCustomSpin(url);
-                    setCustomSoundNames(prev => ({ ...prev, spin: file.name }));
-                } else {
-                    SoundManager.setCustomWin(url);
-                    setCustomSoundNames(prev => ({ ...prev, win: file.name }));
-                }
+                
+                // 改用 FileReader 將實體音效檔案轉碼為 Base64 字串，這樣匯出 JSON 才能真正夾帶音效檔
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64Url = e.target.result;
+                    if (type === 'spin') {
+                        SoundManager.setCustomSpin(base64Url);
+                        setCustomSoundNames(prev => ({ ...prev, spin: file.name }));
+                    } else {
+                        SoundManager.setCustomWin(base64Url);
+                        setCustomSoundNames(prev => ({ ...prev, win: file.name }));
+                    }
+                };
+                reader.readAsDataURL(file);
+                
+                // 清空 input 的值，確保重複上傳同一個檔案時也能觸發 onChange
+                event.target.value = '';
             };
 
             const handleResetSound = (type) => {
