@@ -651,7 +651,7 @@
                 reader.onload = (e) => {
                     const text = e.target.result;
                     const lines = text.split(/\r\n|\n/);
-                    const newParticipants = [];
+                    const importedParticipants = [];
                     const newGroups = new Set(visibleGroups);
                     for (let i = 1; i < lines.length; i++) {
                         const line = lines[i].trim();
@@ -660,18 +660,35 @@
                             const name = parts[0]?.trim();
                             const group = parts[1]?.trim() || '一般';
                             if (name) {
-                                newParticipants.push({ id: Date.now() + Math.random() + i, name: name, group: group, active: true, won: false, bonusWon: false, forfeited: false });
+                                importedParticipants.push({ id: Date.now() + Math.random() + i, name: name, group: group, active: true, won: false, bonusWon: false, forfeited: false });
                                 newGroups.add(group);
                             }
                         }
                     }
-                    if (newParticipants.length > 0) {
+                    if (importedParticipants.length > 0) {
                         setScenes(prev => prev.map(scene => {
                             if (scene.id !== activeSceneId) return scene;
-                            return { ...scene, participants: [...scene.participants, ...newParticipants] };
+                            
+                            // 智慧合併：以匯入的新名單為準。若原本舊名單中已經有這個人，則保留他先前的中獎、棄權狀態
+                            const mergedParticipants = importedParticipants.map(newP => {
+                                const existingP = scene.participants.find(p => p.name === newP.name && p.group === newP.group);
+                                if (existingP) {
+                                    return { 
+                                        ...newP, 
+                                        id: existingP.id, 
+                                        active: existingP.active, 
+                                        won: existingP.won, 
+                                        bonusWon: existingP.bonusWon, 
+                                        forfeited: existingP.forfeited 
+                                    };
+                                }
+                                return newP;
+                            });
+                            
+                            return { ...scene, participants: mergedParticipants };
                         }));
                         setVisibleGroups(newGroups);
-                        setToastMsg(`✅ 成功匯入 ${newParticipants.length} 筆名單！`);
+                        setToastMsg(`✅ 成功匯入並更新為 ${importedParticipants.length} 筆名單！`);
                     } else { setToastMsg("⚠️ 檔案中似乎沒有有效資料，請檢查格式。"); }
                 };
                 reader.readAsText(file);
