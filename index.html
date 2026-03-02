@@ -358,6 +358,16 @@
         const CheckSquare = (props) => (<Icon {...props}><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></Icon>);
         const List = (props) => (<Icon {...props}><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></Icon>);
 
+        // 新增：用來將陣列隨機打亂的洗牌函式 (Fisher-Yates Shuffle)
+        const shuffleArray = (array) => {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        };
+
         // 預設資料
         const DEFAULT_SCENES = [
             {
@@ -377,7 +387,7 @@
                 ],
                 history: [],
                 weights: {},
-                forfeitTargetId: null
+                forfeitTargetId: null // 紀錄自動扣除的目標獎項 ID
             },
             {
                 id: 'scene-2',
@@ -563,11 +573,14 @@
             const gridCandidates = useMemo(() => {
                 if (isSpinning || showWinnerModal) return drawPool;
                 
-                return currentScene.participants.filter(p => 
+                const filtered = currentScene.participants.filter(p => 
                     p.active && 
                     visibleGroups.has(p.group || '未分類')
                 );
-            }, [currentScene, visibleGroups, isSpinning, showWinnerModal, drawPool]);
+                
+                // 將過濾後準備顯示的名單隨機打亂
+                return shuffleArray(filtered);
+            }, [currentScene.participants, visibleGroups, isSpinning, showWinnerModal, drawPool]);
 
             const totalWonValue = useMemo(() => {
                 return currentScene.history.reduce((acc, curr) => acc + (curr.prizeValue || 0), 0);
@@ -802,9 +815,12 @@
                 const visibleParticipants = currentScene.participants.filter(p => 
                     p.active && visibleGroups.has(p.group || '未分類')
                 );
+                
+                // 抽獎鎖定畫面時也要打亂，避免按下的瞬間順序跳回預設
+                const shuffledVisible = shuffleArray(visibleParticipants);
 
                 // 被標記為棄權(forfeited: true)的人也喪失抽獎資格
-                const eligibleCandidates = visibleParticipants.filter(p => 
+                const eligibleCandidates = shuffledVisible.filter(p => 
                     currentPrize.isBonus ? (!p.bonusWon && !p.forfeited) : (!p.won && !p.forfeited)
                 );
                 
@@ -816,7 +832,7 @@
                 SoundManager.init();
                 SoundManager.startSpin();
 
-                setDrawPool(visibleParticipants); 
+                setDrawPool(shuffledVisible); 
                 setIsSpinning(true);
                 setShowWinnerModal(false);
                 setHighlightId(null);
@@ -1311,7 +1327,7 @@
                 setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:s.prizes.filter(p=>p.id!==editingPrize.id)}:s)); 
                 closeEditPrize(); 
                 if(selectedPrizeId===editingPrize.id)setSelectedPrizeId(null); 
-                setToastMsg("獎項已刪除！");
+                setToastMsg("獎項已刪除！(如為誤刪可點擊上方復原鍵)");
             };
             
             const handleAddBonus = () => { setScenes(prev=>prev.map(s=>s.id===activeSceneId?{...s, prizes:[...s.prizes, {id:Date.now(), name:bonusName, count:parseInt(bonusCount), value:parseInt(bonusAmount)||0, isBonus:true}]} : s)); setShowBonusModal(false); setBonusName('加碼紅包'); setBonusAmount(1000); setBonusCount(1); };
@@ -1511,7 +1527,6 @@
                                                 <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">
                                                     {record.prizeName} {record.isForfeit && record.originalPrizeName ? <span className="text-gray-400 ml-1">(原: {record.originalPrizeName})</span> : ''}
                                                 </span>
-                                                {record.prizeValue > 0 && !record.isForfeit && <span className="text-[10px] text-gray-400 mt-1 font-bold">${record.prizeValue.toLocaleString()}</span>}
                                                 {record.isForfeit && <span className="text-[10px] text-gray-400 mt-1 font-bold">棄權</span>}
                                             </div>
                                         </li>
