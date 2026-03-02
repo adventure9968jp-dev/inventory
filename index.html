@@ -386,8 +386,7 @@
                     { id: 2, name: '特休一日券', count: 1, value: 0, isBonus: false },
                 ],
                 history: [],
-                weights: {},
-                forfeitTargetId: null // 紀錄自動扣除的目標獎項 ID
+                weights: {}
             },
             {
                 id: 'scene-2',
@@ -401,8 +400,7 @@
                     { id: 1, name: 'iPhone 15', count: 1, value: 29900, isBonus: false },
                 ],
                 history: [],
-                weights: {},
-                forfeitTargetId: null
+                weights: {}
             }
         ];
 
@@ -905,21 +903,10 @@
                 setHighlightId(null);
             }, [activeSceneId, lastWinner]);
 
-            // 抽獎當下按下棄權
+            // 抽獎當下按下棄權 (已移除對特定獎項數量的扣除，純粹增加棄權紀錄與人數)
             const handleForfeitDraw = useCallback(() => {
                 if (!lastWinner?.person) return;
                 
-                const targetPrizeId = parseInt(currentScene.forfeitTargetId);
-                if (!targetPrizeId) {
-                    setToastMsg("⚠️ 請先至「設定」中選擇「棄權扣除項目」！");
-                    return;
-                }
-                const targetPrize = currentScene.prizes.find(p => p.id === targetPrizeId);
-                if (!targetPrize || targetPrize.count <= 0) {
-                    setToastMsg("⚠️ 設定的棄權扣除項目已無剩餘數量！");
-                    return;
-                }
-
                 const { person, prize: drawnPrize } = lastWinner;
                 
                 setScenes(prev => prev.map(scene => {
@@ -933,7 +920,7 @@
                         return p;
                     });
 
-                    // 確保有「棄權」這個獎項，扣除目標項目數量，增加棄權數量
+                    // 確保有「棄權」這個獎項，僅增加棄權數量，不再去扣除其他任何獎項
                     let forfeitPrize = scene.prizes.find(p => p.id === 'forfeit');
                     let updatedPrizes = [...scene.prizes];
                     if (!forfeitPrize) {
@@ -941,7 +928,6 @@
                         updatedPrizes.push(forfeitPrize);
                     }
                     updatedPrizes = updatedPrizes.map(p => {
-                        if (p.id === targetPrizeId) return { ...p, count: p.count - 1 };
                         if (p.id === 'forfeit') return { ...p, count: p.count + 1 };
                         return p;
                     });
@@ -954,10 +940,8 @@
                         personGroup: person.group, 
                         prizeName: '棄權',
                         originalPrizeName: drawnPrize.name, // 原本抽到的獎
-                        deductedPrizeId: targetPrize.id, // 記錄實際扣掉哪一個獎
-                        deductedPrizeName: targetPrize.name, 
                         prizeId: 'forfeit', 
-                        prizeValue: targetPrize.value || 0, // 使用被扣除獎項的價值
+                        prizeValue: 0, // 無價值
                         isForfeit: true
                     }, ...scene.history];
 
@@ -965,10 +949,10 @@
                 }));
                 setShowWinnerModal(false);
                 setHighlightId(null);
-                setToastMsg(`已標記棄權，並自動扣除「${targetPrize.name}」1個名額`);
+                setToastMsg(`已標記棄權！`);
             }, [activeSceneId, lastWinner, currentScene]);
 
-            // 取消棄權 (復原) - 完全復原為白名單，不回到原本抽到的獎項，只退還預扣項目
+            // 取消棄權 (復原) - 完全復原為白名單，不回到原本抽到的獎項，只減少棄權紀錄人數
             const handleCancelForfeit = (record) => {
                 setScenes(prev => prev.map(scene => {
                     if (scene.id !== activeSceneId) return scene;
@@ -981,12 +965,9 @@
                         return p;
                     });
 
-                    // 2. 恢復獎項數量 (當初扣除的獎項+1，棄權數量-1，不再去動原本抽到的獎項)
+                    // 2. 恢復獎項數量 (棄權數量-1，不再去動原本抽到的獎項)
                     const updatedPrizes = scene.prizes.map(p => {
                         if (p.id === 'forfeit') return { ...p, count: Math.max(0, p.count - 1) };
-                        if (record.deductedPrizeId && p.id === record.deductedPrizeId) {
-                            return { ...p, count: p.count + 1 };
-                        }
                         return p;
                     });
 
@@ -995,25 +976,14 @@
 
                     return { ...scene, participants: updatedParticipants, prizes: updatedPrizes, history: updatedHistory };
                 }));
-                setToastMsg("已取消棄權，恢復該員抽獎資格與扣除項目的名額！");
+                setToastMsg("已取消棄權，恢復該員抽獎資格！");
             };
 
-            // 批次改為棄權
+            // 批次改為棄權 (從已中獎的狀態改為棄權)
             const handleBatchRetrospectiveForfeit = () => {
                 const recordIds = Array.from(selectedForfeitIds);
                 if (recordIds.length === 0) {
                     setToastMsg("⚠️ 請先勾選要棄權的人員！");
-                    return;
-                }
-
-                const targetPrizeId = parseInt(currentScene.forfeitTargetId);
-                if (!targetPrizeId) {
-                    setToastMsg("⚠️ 請先至「設定」中選擇「棄權扣除項目」！");
-                    return;
-                }
-                const targetPrize = currentScene.prizes.find(p => p.id === targetPrizeId);
-                if (!targetPrize || targetPrize.count < recordIds.length) {
-                    setToastMsg(`⚠️ 設定的棄權扣除項目剩餘數量不足 (需要 ${recordIds.length} 個)！`);
                     return;
                 }
 
@@ -1030,10 +1000,9 @@
                     const recordsToForfeit = scene.history.filter(h => recordIds.includes(h.recordId) && !h.isForfeit);
                     const countToForfeit = recordsToForfeit.length;
 
-                    // 更新獎項數量
+                    // 更新獎項數量：僅將他們原本佔用的名額還給原獎項，並增加棄權總數
                     updatedPrizes = updatedPrizes.map(p => {
                         let newCount = p.count;
-                        if (p.id === targetPrizeId) newCount -= countToForfeit;
                         if (p.id === 'forfeit') newCount += countToForfeit;
                         
                         // 恢復原本獎項的名額
@@ -1050,11 +1019,9 @@
                                 ...h, 
                                 isForfeit: true, 
                                 originalPrizeName: h.prizeName,
-                                deductedPrizeId: targetPrize.id,
-                                deductedPrizeName: targetPrize.name,
                                 prizeName: '棄權',
                                 prizeId: 'forfeit',
-                                prizeValue: targetPrize.value || 0
+                                prizeValue: 0
                             };
                         }
                         return h;
@@ -1072,7 +1039,7 @@
                     return { ...scene, prizes: updatedPrizes, history: updatedHistory, participants: updatedParticipants };
                 }));
 
-                setToastMsg(`已將 ${recordIds.length} 人改為棄權，原獎項已恢復，並扣除「${targetPrize.name}」！`);
+                setToastMsg(`已將 ${recordIds.length} 人改為棄權，原獎項名額已恢復！`);
                 setIsForfeitMode(false);
                 setSelectedForfeitIds(new Set());
             };
@@ -1309,7 +1276,7 @@
                 }));
             };
 
-            const addNewScene = () => { const id=`scene-${Date.now()}`; setScenes([...scenes, {id, title:`新活動`, participants:[], prizes:[], history:[], weights:{}, forfeitTargetId: null}]); setActiveSceneId(id); };
+            const addNewScene = () => { const id=`scene-${Date.now()}`; setScenes([...scenes, {id, title:`新活動`, participants:[], prizes:[], history:[], weights:{}}]); setActiveSceneId(id); };
             const deleteScene = (e, id) => { e.stopPropagation(); if(scenes.length===1)return; const ns=scenes.filter(s=>s.id!==id); setScenes(ns); if(activeSceneId===id)setActiveSceneId(ns[0].id); };
             const addPrize = () => { 
                 if(!newPrizeName.trim()) return; 
@@ -1527,6 +1494,7 @@
                                                 <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full border border-yellow-200">
                                                     {record.prizeName} {record.isForfeit && record.originalPrizeName ? <span className="text-gray-400 ml-1">(原: {record.originalPrizeName})</span> : ''}
                                                 </span>
+                                                {/* 取消顯示價值的標籤：已經被移除 */}
                                                 {record.isForfeit && <span className="text-[10px] text-gray-400 mt-1 font-bold">棄權</span>}
                                             </div>
                                         </li>
@@ -2060,30 +2028,6 @@
                                                 <button onClick={addPrize} className="bg-yellow-400 text-yellow-900 px-6 py-2 rounded-lg font-black hover:bg-yellow-500 whitespace-nowrap shadow-md uppercase tracking-wide text-sm">新增獎項</button>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    {/* 棄權扣除項目 */}
-                                    <div>
-                                        <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Trash2 size={18}/> 棄權扣除項目</h3>
-                                        <div className="bg-gray-50 p-4 rounded-xl border-2 border-gray-100 flex items-center gap-4">
-                                            <div className="flex-1">
-                                                <label className="block text-xs font-bold text-gray-500 mb-1">請選擇棄權時自動扣除數量的獎項</label>
-                                                <select 
-                                                    className="w-full border-2 border-gray-200 p-2.5 rounded-lg focus:border-red-500 focus:outline-none font-bold text-gray-700"
-                                                    value={currentScene.forfeitTargetId || ''}
-                                                    onChange={e => {
-                                                        const val = e.target.value;
-                                                        setScenes(prev => prev.map(s => s.id === activeSceneId ? { ...s, forfeitTargetId: val } : s));
-                                                    }}
-                                                >
-                                                    <option value="">請選擇...</option>
-                                                    {currentScene.prizes.filter(p => p.id !== 'forfeit').map(p => (
-                                                        <option key={p.id} value={p.id}>{p.name} (剩餘 {p.count})</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-gray-400 mt-2 ml-1">※ 設定後，在抽獎畫面按下「放棄資格」，系統會自動將該項目名額轉移至棄權中。</p>
                                     </div>
 
                                     <div>
